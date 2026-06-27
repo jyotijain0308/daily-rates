@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}PPT Daily Rates{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+    <div class="app-shell">
+        <header class="topbar">
+            <div class="topbar-inner">
+                <a href="/" class="brand">
+                    <span class="brand-icon">📊</span>
+                    <span class="brand-text">PPT Daily Rates</span>
+                </a>
+                <button class="nav-toggle" id="navToggle" aria-label="Toggle navigation">☰</button>
+                <nav class="main-nav" id="mainNav">
+                    <a href="/" class="nav-link {% if active_page == 'dashboard' %}active{% endif %}">Dashboard</a>
+                    <a href="/import" class="nav-link {% if active_page == 'import' %}active{% endif %}">Import</a>
+                    <a href="/products" class="nav-link {% if active_page == 'products' %}active{% endif %}">Products</a>
+                    <a href="/generate" class="nav-link {% if active_page == 'generate' %}active{% endif %}">Generate</a>
+                </nav>
+            </div>
+        </header>
+
+        <div class="workflow-bar">
+            <div class="workflow-steps">
+                <a href="/import" class="workflow-step {% if active_page == 'import' %}current{% elif active_page in ['products', 'generate', 'dashboard'] %}done{% endif %}">
+                    <span class="step-num">1</span> Import
+                </a>
+                <span class="workflow-arrow">→</span>
+                <a href="/products" class="workflow-step {% if active_page == 'products' %}current{% elif active_page in ['generate', 'dashboard'] %}done{% endif %}">
+                    <span class="step-num">2</span> Manage
+                </a>
+                <span class="workflow-arrow">→</span>
+                <a href="/generate" class="workflow-step {% if active_page == 'generate' %}current{% elif active_page == 'dashboard' %}done{% endif %}">
+                    <span class="step-num">3</span> Generate
+                </a>
+                <span class="workflow-arrow">→</span>
+                <span class="workflow-step {% if active_page == 'dashboard' %}current{% endif %}">
+                    <span class="step-num">4</span> Download
+                </span>
+            </div>
+        </div>
+
+        <main class="main-content">
+            {% block content %}{% endblock %}
+        </main>
+
+        <footer class="footer">
+            <p>PPT Daily Rates System &mdash; Professional rate presentations</p>
+        </footer>
+    </div>
+
+    <div id="toastContainer" class="toast-container" aria-live="polite"></div>
+
+    <script src="{{ url_for('static', filename='js/api.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/notifications.js') }}"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

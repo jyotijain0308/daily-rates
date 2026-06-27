@@ -1,0 +1,7 @@
+services:
+  flask-app:
+    build: .
+    container_name: flask-app
+    restart: always
+    ports:
+      - "80:8000"

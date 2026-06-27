@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+
+{% block title %}Generate File — PPT Daily Rates{% endblock %}
+
+{% block content %}
+<section class="page-header">
+    <div>
+        <h1>Generate Presentation</h1>
+        <p class="subtitle">Create a PPT or MP4 for a selected country</p>
+    </div>
+</section>
+
+<section class="card generate-card">
+    <div class="generate-status" id="generateStatus">
+        <div class="status-icon" id="statusIcon">📊</div>
+        <div class="status-info">
+            <h2 id="statusTitle">Ready to Generate</h2>
+            <p id="statusMessage">Import products first to enable generation.</p>
+            <p class="text-muted" id="productCountInfo"></p>
+        </div>
+    </div>
+
+    <div class="progress-wrap" id="progressWrap" style="display:none;">
+        <div class="progress-bar">
+            <div class="progress-fill" id="progressFill"></div>
+        </div>
+        <p class="progress-text" id="progressText">Generating presentation...</p>
+    </div>
+
+    <div class="form-grid">
+        <div class="form-group">
+            <label for="countrySelect">Country</label>
+            <select id="countrySelect" class="input" disabled>
+                <option value="">Select country</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="formatSelect">Format</label>
+            <select id="formatSelect" class="input">
+                <option value="ppt">PPT</option>
+                <option value="mp4">MP4</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="form-actions generate-actions">
+        <button type="button" class="btn btn-primary btn-lg" id="generateBtn" disabled>
+            Generate
+        </button>
+        <a href="#" class="btn btn-success btn-lg" id="downloadBtn" style="display:none;">
+            Download File
+        </a>
+    </div>
+</section>
+
+<section class="card" id="latestSection" style="display:none;">
+    <h2>Latest Generation</h2>
+    <div class="latest-info" id="latestInfo"></div>
+</section>
+
+<section class="card">
+    <h2>Generation History</h2>
+    <div id="historyWrap">
+        <p class="empty-state">Loading history...</p>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/generate.js') }}"></script>
+{% endblock %}

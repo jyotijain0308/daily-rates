@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+
+{% block title %}Products — PPT Daily Rates{% endblock %}
+
+{% block content %}
+<section class="page-header">
+    <div>
+        <h1>Product Management</h1>
+        <p class="subtitle">View and edit product rates inline</p>
+    </div>
+    <button type="button" class="btn btn-primary" id="addProductBtn">+ Add Product</button>
+</section>
+
+<section class="card">
+    <div class="card-header-row">
+        <div class="search-box">
+            <input type="search" id="productSearch" placeholder="Search products..." class="input">
+        </div>
+        <span class="text-muted" id="productCount">Loading...</span>
+    </div>
+
+    <div class="table-wrap">
+        <table class="data-table" id="productsTable">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Country of origin</th>
+                    <th>Shipment by</th>
+                    <th>Weight in kg</th>
+                    <th>Packing</th>
+                    <th>Price in AED</th>
+                    <th>Updated</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="productsBody">
+                <tr><td colspan="8" class="empty-state">Loading products...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<div class="modal-overlay" id="productModal" style="display:none;">
+    <div class="modal">
+        <div class="modal-header">
+            <h2 id="modalTitle">Add Product</h2>
+            <button type="button" class="modal-close" id="closeModalBtn">&times;</button>
+        </div>
+        <form id="productForm">
+            <input type="hidden" id="productId">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="productSerialNo">S.No.</label>
+                    <input type="number" step="1" id="productSerialNo" class="input">
+                </div>
+                <div class="form-group">
+                    <label for="productCountryOfOrigin">Country of origin *</label>
+                    <input type="text" id="productCountryOfOrigin" class="input" list="countryOptions" required>
+                    <datalist id="countryOptions"></datalist>
+                </div>
+                <div class="form-group">
+                    <label for="productShipmentBy">Shipment by *</label>
+                    <input type="text" id="productShipmentBy" class="input" required>
+                </div>
+                <div class="form-group">
+                    <label for="productName">Product Name *</label>
+                    <input type="text" id="productName" class="input" required>
+                </div>
+                <div class="form-group">
+                    <label for="productWeightKg">Weight in kg *</label>
+                    <input type="number" step="0.01" id="productWeightKg" class="input" required>
+                </div>
+                <div class="form-group">
+                    <label for="productPacking">Packing *</label>
+                    <input type="text" id="productPacking" class="input" required>
+                </div>
+                <div class="form-group">
+                    <label for="productPriceAed">Price in AED *</label>
+                    <input type="number" step="0.01" id="productPriceAed" class="input" required>
+                </div>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn btn-secondary" id="cancelModalBtn">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save Product</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/products.js') }}"></script>
+{% endblock %}

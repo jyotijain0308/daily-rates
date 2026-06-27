@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard — PPT Daily Rates{% endblock %}
+
+{% block content %}
+<section class="page-header">
+    <div>
+        <h1>Dashboard</h1>
+        <p class="subtitle">Overview of your product rates and presentation status</p>
+    </div>
+</section>
+
+<div class="stats-grid" id="statsGrid">
+    <div class="stat-card loading-card"><div class="stat-value">—</div><div class="stat-label">Products</div></div>
+    <div class="stat-card loading-card"><div class="stat-value">—</div><div class="stat-label">Categories</div></div>
+    <div class="stat-card loading-card"><div class="stat-value">—</div><div class="stat-label">Generations</div></div>
+    <div class="stat-card loading-card"><div class="stat-value">—</div><div class="stat-label">Latest PPT</div></div>
+</div>
+
+<section class="card">
+    <h2>Quick Actions</h2>
+    <div class="action-grid">
+        <a href="/import" class="action-card">
+            <span class="action-icon">📥</span>
+            <h3>Import CSV</h3>
+            <p>Upload product rates from a CSV file</p>
+        </a>
+        <a href="/products" class="action-card">
+            <span class="action-icon">✏️</span>
+            <h3>Manage Products</h3>
+            <p>View and edit rates inline</p>
+        </a>
+        <a href="/generate" class="action-card" id="generateAction">
+            <span class="action-icon">🎯</span>
+            <h3>Generate PPT</h3>
+            <p id="generateActionHint">Create your presentation</p>
+        </a>
+        <a href="#" class="action-card" id="downloadAction" style="display:none;">
+            <span class="action-icon">⬇️</span>
+            <h3>Download PPT</h3>
+            <p id="downloadActionHint">Get the latest file</p>
+        </a>
+    </div>
+</section>
+
+<section class="card">
+    <div class="card-header-row">
+        <h2>Recent Generations</h2>
+    </div>
+    <div id="historyTableWrap">
+        <p class="empty-state">Loading history...</p>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+{% endblock %}

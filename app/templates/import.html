@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+
+{% block title %}Import CSV — PPT Daily Rates{% endblock %}
+
+{% block content %}
+<section class="page-header">
+    <div>
+        <h1>Import Products</h1>
+        <p class="subtitle">Upload a CSV file, preview the data, then save to the database</p>
+    </div>
+    <div class="page-header-actions">
+        <a href="/api/import/sample" class="btn btn-primary" id="downloadSampleBtn" download>Download Sample CSV</a>
+        <button type="button" class="btn btn-secondary" id="downloadTemplateBtn">Blank Template</button>
+    </div>
+</section>
+
+<section class="card">
+    <h2>Upload CSV</h2>
+    <p class="text-muted sample-hint">
+        New here? <a href="/api/import/sample" download>Download the sample CSV</a>
+        with 6 daily product rates, fill in your data, then upload below.
+    </p>
+    <div class="upload-zone" id="uploadZone">
+        <input type="file" id="csvFileInput" accept=".csv" hidden>
+        <div class="upload-content">
+            <span class="upload-icon">📄</span>
+            <p><strong>Drop your CSV here</strong> or click to browse</p>
+            <p class="text-muted">Required columns: S.No., Country of origin, Shipment by, Product Name, Weight in kg, Packing, Price in AED</p>
+        </div>
+    </div>
+    <div id="selectedFileInfo" class="selected-file" style="display:none;"></div>
+</section>
+
+<section class="card" id="previewSection" style="display:none;">
+    <div class="card-header-row">
+        <h2>Preview</h2>
+        <div class="preview-badges">
+            <span class="badge badge-success" id="validCountBadge">0 valid</span>
+            <span class="badge badge-error" id="errorCountBadge" style="display:none;">0 errors</span>
+        </div>
+    </div>
+
+    <div id="errorList" class="error-list" style="display:none;"></div>
+
+    <div class="table-wrap">
+        <table class="data-table" id="previewTable">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Country of origin</th>
+                    <th>Shipment by</th>
+                    <th>Weight in kg</th>
+                    <th>Packing</th>
+                    <th>Price in AED</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+    <div class="form-actions">
+        <button type="button" class="btn btn-secondary" id="cancelImportBtn">Cancel</button>
+        <button type="button" class="btn btn-primary" id="saveImportBtn" disabled>Save to Database</button>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/import.js') }}"></script>
+{% endblock %}

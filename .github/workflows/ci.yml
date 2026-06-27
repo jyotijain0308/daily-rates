@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Test Python app
+    runs-on: macos-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Compile source
+        run: |
+          python -m py_compile \
+            models.py \
+            wsgi.py \
+            csv_importer.py \
+            ppt_service.py \
+            app/routes/product_routes.py \
+            app/routes/import_routes.py \
+            app/routes/generation_routes.py \
+            src/config.py \
+            src/product_data.py \
+            src/ppt_generator.py \
+            src/video_generator.py \
+            src/error_handling.py
+
+      - name: Run tests
+        env:
+          PYTHONWARNINGS: default
+        run: python -m unittest tests/test_api.py

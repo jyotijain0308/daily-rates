@@ -1,0 +1,15 @@
+.venv
+venv_web
+venv_ppt
+__pycache__
+*.pyc
+*.pyo
+*.log
+.git
+.github
+.idea
+.DS_Store
+output/*.pptx
+output/*.mp4
+uploads/*
+instance/*.db
