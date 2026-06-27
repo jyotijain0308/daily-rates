@@ -157,6 +157,10 @@ jobs:
 
           docker stop "$CONTAINER_NAME" 2>/dev/null || true
           docker rm "$CONTAINER_NAME" 2>/dev/null || true
+          EXISTING_PORT_80_CONTAINER="$(docker ps --filter publish=80 --format '{{.ID}}' | head -n 1 || true)"
+          if [ -n "$EXISTING_PORT_80_CONTAINER" ]; then
+            docker stop "$EXISTING_PORT_80_CONTAINER"
+          fi
 
           docker run -d \
             --name "$CONTAINER_NAME" \
