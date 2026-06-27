@@ -6,29 +6,26 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment: production
 
     steps:
       - name: Validate SSH secrets
         env:
-          SSH_HOST: ${{ secrets.AWS_HOST || secrets.EC2_HOST }}
-          SSH_USER: ${{ secrets.AWS_USER || secrets.EC2_USER }}
-          SSH_KEY: ${{ secrets.AWS_SSH_KEY || secrets.EC2_SSH_KEY }}
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
         run: |
           set -euo pipefail
-          if [ -z "${SSH_HOST}" ] || [ -z "${SSH_USER}" ] || [ -z "${SSH_KEY}" ]; then
-            echo "Missing one or more required SSH secrets."
-            echo "Set either AWS_HOST, AWS_USER, AWS_SSH_KEY or EC2_HOST, EC2_USER, EC2_SSH_KEY."
-            echo "If these are environment secrets, make sure they are added under the production environment."
+          if [ -z "${EC2_HOST}" ] || [ -z "${EC2_USER}" ] || [ -z "${EC2_SSH_KEY}" ]; then
+            echo "Missing one or more required repository secrets: EC2_HOST, EC2_USER, EC2_SSH_KEY"
             exit 1
           fi
 
       - name: Deploy on EC2
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.AWS_HOST || secrets.EC2_HOST }}
-          username: ${{ secrets.AWS_USER || secrets.EC2_USER }}
-          key: ${{ secrets.AWS_SSH_KEY || secrets.EC2_SSH_KEY }}
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
           port: 22
           script_stop: true
           command_timeout: 20m

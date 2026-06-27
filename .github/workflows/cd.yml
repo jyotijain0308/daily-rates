@@ -96,28 +96,29 @@ jobs:
     steps:
       - name: Configure SSH
         env:
-          AWS_HOST: ${{ secrets.AWS_HOST }}
-          AWS_USER: ${{ secrets.AWS_USER }}
-          AWS_SSH_KEY: ${{ secrets.AWS_SSH_KEY }}
+          SSH_HOST: ${{ secrets.AWS_HOST || secrets.EC2_HOST }}
+          SSH_USER: ${{ secrets.AWS_USER || secrets.EC2_USER }}
+          SSH_KEY: ${{ secrets.AWS_SSH_KEY || secrets.EC2_SSH_KEY }}
         run: |
           set -euo pipefail
 
-          if [ -z "${AWS_HOST}" ] || [ -z "${AWS_USER}" ] || [ -z "${AWS_SSH_KEY}" ]; then
-            echo "Missing one or more required secrets: AWS_HOST, AWS_USER, AWS_SSH_KEY"
+          if [ -z "${SSH_HOST}" ] || [ -z "${SSH_USER}" ] || [ -z "${SSH_KEY}" ]; then
+            echo "Missing one or more required SSH secrets."
+            echo "Set EC2_HOST, EC2_USER, EC2_SSH_KEY as repository secrets."
             exit 1
           fi
 
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
-          printf '%s\n' "${AWS_SSH_KEY}" | tr -d '\r' > ~/.ssh/aws_ec2_key
+          printf '%s\n' "${SSH_KEY}" | tr -d '\r' > ~/.ssh/aws_ec2_key
           chmod 600 ~/.ssh/aws_ec2_key
           ssh-keygen -y -f ~/.ssh/aws_ec2_key > /dev/null
-          ssh-keyscan -H "${AWS_HOST}" >> ~/.ssh/known_hosts
+          ssh-keyscan -H "${SSH_HOST}" >> ~/.ssh/known_hosts
 
       - name: Deploy container
         env:
-          AWS_HOST: ${{ secrets.AWS_HOST }}
-          AWS_USER: ${{ secrets.AWS_USER }}
+          SSH_HOST: ${{ secrets.AWS_HOST || secrets.EC2_HOST }}
+          SSH_USER: ${{ secrets.AWS_USER || secrets.EC2_USER }}
           IMAGE: ${{ needs.build-and-push.outputs.image }}:${{ github.sha }}
           GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
           GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
@@ -125,7 +126,7 @@ jobs:
           ssh -i ~/.ssh/aws_ec2_key \
             -o BatchMode=yes \
             -o IdentitiesOnly=yes \
-            "${AWS_USER}@${AWS_HOST}" \
+            "${SSH_USER}@${SSH_HOST}" \
             "IMAGE='${IMAGE}' \
              GHCR_USERNAME='${GHCR_USERNAME}' \
              GHCR_TOKEN='${GHCR_TOKEN}' \
