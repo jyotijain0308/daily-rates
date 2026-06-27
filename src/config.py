@@ -1,6 +1,8 @@
 """
 Configuration module for PPT Daily Rates System
 """
+import os
+
 from pptx.util import Inches, Pt
 from pptx.dml.color import RGBColor
 
@@ -13,6 +15,16 @@ COMPANY_WEBSITE = "https://www.easternfarmsllc.com"
 COMPANY_LOGO_IMAGE = "assets/company_logo.png"
 UAE_LOGO_IMAGE = "assets/uae_logo.png"
 PRODUCT_IMAGES_DIR = "assets/products"
+
+# Product image search API Configuration
+PEXELS_API_KEY = os.getenv(
+    "PEXELS_API_KEY",
+    "URdYNWJH4VRSWwMsCZ7HTHzwhG9bJOQNPGZnDjSVEtxGl5c8OTqKdSOv",
+)
+PEXELS_API_URL = "https://api.pexels.com/v1/search"
+PRODUCT_IMAGE_PROVIDER = "pexels"
+PRODUCT_IMAGE_AUTO_FETCH = os.getenv("PRODUCT_IMAGE_AUTO_FETCH", "true").lower() == "true"
+PRODUCT_IMAGE_FETCH_TIMEOUT_SECONDS = 10
 
 # Presentation Settings
 SLIDE_WIDTH = Inches(10)
@@ -58,6 +70,9 @@ CACHE_DURATION_HOURS = 24  # Cache exchange rates for 24 hours
 # Data file paths
 PRODUCTS_DATA_FILE = "data/products.csv"
 OUTPUT_PPT_FILE = "output/daily_rates.pptx"
+OUTPUT_CLEANUP_ENABLED = True
+OUTPUT_CLEANUP_DIRS = ["output", "src/output"]
+OUTPUT_CLEANUP_EXTENSIONS = [".pptx", ".mp4"]
 
 # Product Rate Format
 CURRENCY = "AED"
@@ -87,7 +102,7 @@ COUNTRY_CURRENCY_CODES = {
 }
 
 COUNTRY_LOGO_IMAGES = {
-    "India": "assets/countries/india-large.png",
+    "India": "assets/countries/india.png",
     "United States": "assets/countries/united_states.png",
     "Brazil": "assets/countries/brazil.png",
     "Thailand": "assets/countries/thailand.png",

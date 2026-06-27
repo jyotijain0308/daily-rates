@@ -1,6 +1,5 @@
 """PPT Generator - Create country-specific product price list presentations."""
 import logging
-import re
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -14,9 +13,10 @@ from pptx.util import Inches, Pt
 from config import (
     SLIDE_WIDTH, SLIDE_HEIGHT, COLORS, FONTS, FONT_SIZES, MARGINS,
     COMPANY_NAME, COMPANY_ADDRESS, COMPANY_WEBSITE, COMPANY_LOGO_IMAGE,
-    UAE_LOGO_IMAGE, COUNTRY_LOGO_IMAGES, PRODUCT_IMAGES_DIR, CURRENCY, RATE_DISPLAY_FORMAT
+    UAE_LOGO_IMAGE, COUNTRY_LOGO_IMAGES, CURRENCY, RATE_DISPLAY_FORMAT
 )
 from product_data import ProductData
+from product_image_service import ProductImageService
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +28,7 @@ class PPTGenerator:
         self.prs = Presentation()
         self.prs.slide_width = SLIDE_WIDTH
         self.prs.slide_height = SLIDE_HEIGHT
+        self.product_images = ProductImageService()
 
     def _resolve_asset(self, image_path: Optional[str]) -> Optional[Path]:
         if not image_path:
@@ -98,12 +99,7 @@ class PPTGenerator:
         fill.fore_color.rgb = COLORS[color_key]
 
     def _product_image_path(self, product_name: str) -> Optional[str]:
-        slug = re.sub(r"[^a-z0-9]+", "_", product_name.lower()).strip("_")
-        for extension in ("png", "jpg", "jpeg"):
-            candidate = f"{PRODUCT_IMAGES_DIR}/{slug}.{extension}"
-            if self._resolve_asset(candidate):
-                return candidate
-        return None
+        return self.product_images.get_product_image_path(product_name)
 
     def add_country_title_slide(self, country_name: str, current_date: datetime = None):
         """Create country-specific title slide."""

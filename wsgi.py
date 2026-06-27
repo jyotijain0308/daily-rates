@@ -91,6 +91,10 @@ def create_app(config=None):
     # Create necessary directories
     os.makedirs(app.config.get('UPLOAD_FOLDER', 'uploads'), exist_ok=True)
     os.makedirs('output', exist_ok=True)
+    os.makedirs('src/output', exist_ok=True)
+
+    from output_cleanup import cleanup_previous_day_outputs
+    cleanup_previous_day_outputs()
     
     # Register blueprints
     with app.app_context():

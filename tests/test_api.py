@@ -1,11 +1,16 @@
 """End-to-end API tests for PPT Daily Rates System"""
 import io
 import os
+import sys
 import tempfile
 import unittest
+from pathlib import Path
 
 from wsgi import create_app, db
 from models import Product
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
+import config as generator_config
 
 
 class TestPPTDailyRatesAPI(unittest.TestCase):
@@ -18,11 +23,14 @@ class TestPPTDailyRatesAPI(unittest.TestCase):
             'SQLALCHEMY_DATABASE_URI': f'sqlite:///{self.db_path}',
         })
         self.client = self.app.test_client()
+        self.previous_product_image_auto_fetch = generator_config.PRODUCT_IMAGE_AUTO_FETCH
+        generator_config.PRODUCT_IMAGE_AUTO_FETCH = False
 
         with self.app.app_context():
             db.create_all()
 
     def tearDown(self):
+        generator_config.PRODUCT_IMAGE_AUTO_FETCH = self.previous_product_image_auto_fetch
         os.close(self.db_fd)
         os.unlink(self.db_path)
 

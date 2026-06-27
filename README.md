@@ -140,6 +140,8 @@ To stop the server, press `Ctrl+C` in the terminal.
 
 Generated files are saved to `output/`, for example `output/india_products_price_list_20260627_154030.pptx` or `output/india_products_price_list_20260627_154030.mp4`.
 
+On app startup, generated `.pptx` and `.mp4` files from previous days are automatically deleted from `output/` and `src/output/`. Files generated today are kept.
+
 ### Run Tests
 
 ```bash
@@ -245,7 +247,7 @@ Edit `src/config.py` to customize:
 - **Company Details:** Company name, address, website, default country, logo paths
 - **Styling:** Colors (primary, accent, background), fonts, font sizes
 - **Exchange Rates:** API endpoint, cache duration, country-to-currency mappings
-- **Output:** File paths and naming
+- **Output:** File paths, naming, and daily cleanup settings
 
 ### Example: Change Company Name
 

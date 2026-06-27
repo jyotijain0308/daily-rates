@@ -1,6 +1,5 @@
 """MP4 generator for country-specific product price lists."""
 import logging
-import re
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -11,8 +10,9 @@ from PIL import Image, ImageDraw, ImageFont
 
 from config import (
     COLORS, COMPANY_ADDRESS, COMPANY_LOGO_IMAGE, COMPANY_NAME, COMPANY_WEBSITE,
-    COUNTRY_LOGO_IMAGES, PRODUCT_IMAGES_DIR, CURRENCY, RATE_DISPLAY_FORMAT, UAE_LOGO_IMAGE
+    COUNTRY_LOGO_IMAGES, CURRENCY, RATE_DISPLAY_FORMAT, UAE_LOGO_IMAGE
 )
+from product_image_service import ProductImageService
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +32,7 @@ class MP4Generator:
         self.font_heading = self._font(46)
         self.font_title = self._font(62)
         self.font_price = self._font(58)
+        self.product_images = ProductImageService()
 
     def _font(self, size: int):
         for candidate in [
@@ -132,12 +133,7 @@ class MP4Generator:
         return Image.new("RGBA", (self.WIDTH, self.HEIGHT), self._rgb(background) + (255,))
 
     def _product_image_path(self, product_name: str) -> Optional[str]:
-        slug = re.sub(r"[^a-z0-9]+", "_", product_name.lower()).strip("_")
-        for extension in ("png", "jpg", "jpeg"):
-            candidate = f"{PRODUCT_IMAGES_DIR}/{slug}.{extension}"
-            if self._resolve_asset(candidate):
-                return candidate
-        return None
+        return self.product_images.get_product_image_path(product_name)
 
     def _paste_fit_image_or_text(self, image, draw, image_path, fallback_text, box, text_fill):
         left, top, width, height = box
