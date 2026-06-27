@@ -135,6 +135,11 @@ jobs:
              bash -s" <<'EOF'
           set -euo pipefail
 
+          if [ ! -d "$APP_DIR" ] || [ ! -w "$APP_DIR" ]; then
+            sudo mkdir -p "$APP_DIR"
+            sudo chown -R "$(id -u):$(id -g)" "$APP_DIR"
+          fi
+
           mkdir -p "$APP_DIR"/{instance,output,uploads,assets}
 
           if [ -n "${GHCR_USERNAME:-}" ] && [ -n "${GHCR_TOKEN:-}" ]; then
