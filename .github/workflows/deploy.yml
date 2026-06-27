@@ -8,12 +8,27 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Validate SSH secrets
+        env:
+          AWS_HOST: ${{ secrets.AWS_HOST }}
+          AWS_USER: ${{ secrets.AWS_USER }}
+          AWS_SSH_KEY: ${{ secrets.AWS_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${AWS_HOST}" ] || [ -z "${AWS_USER}" ] || [ -z "${AWS_SSH_KEY}" ]; then
+            echo "Missing one or more required secrets: AWS_HOST, AWS_USER, AWS_SSH_KEY"
+            exit 1
+          fi
+
       - name: Deploy on EC2
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
+          host: ${{ secrets.AWS_HOST }}
+          username: ${{ secrets.AWS_USER }}
+          key: ${{ secrets.AWS_SSH_KEY }}
+          port: 22
+          script_stop: true
+          command_timeout: 20m
           script: |
             cd ~/flask-app
             git pull origin main
