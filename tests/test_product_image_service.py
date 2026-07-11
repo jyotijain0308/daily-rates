@@ -125,6 +125,50 @@ class TestProductImageService(unittest.TestCase):
 
         self.assertEqual(query, "Wheat Flour United Arab Emirates agro product")
 
+    def test_builds_search_query_from_description_when_provided(self):
+        query = self.service._build_search_query(
+            "Wheat Flour",
+            "United Arab Emirates",
+            "Wheat Flour United Arab Emirates close up product",
+        )
+
+        self.assertEqual(query, "Wheat Flour United Arab Emirates close up product agro product")
+
+    def test_search_product_images_returns_max_five_candidates(self):
+        search_response = Mock()
+        search_response.json.return_value = {
+            "photos": [
+                {
+                    "alt": "Wheat bag",
+                    "photographer": "Test Photographer",
+                    "src": {
+                        "tiny": "https://images.pexels.com/photos/wheat_tiny.jpg",
+                        "medium": "https://images.pexels.com/photos/wheat_medium.jpg",
+                    },
+                }
+            ]
+        }
+        search_response.raise_for_status.return_value = None
+
+        with patch("product_image_service.requests.get", return_value=search_response) as mock_get:
+            result = self.service.search_product_images(
+                "Wheat Flour",
+                "India",
+                description="Wheat Flour India product highlight",
+                page=2,
+                per_page=9,
+            )
+
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["image_url"], "https://images.pexels.com/photos/wheat_medium.jpg")
+        self.assertEqual(result[0]["thumb_url"], "https://images.pexels.com/photos/wheat_tiny.jpg")
+        self.assertEqual(mock_get.call_args.kwargs["params"]["per_page"], 5)
+        self.assertEqual(mock_get.call_args.kwargs["params"]["page"], 2)
+        self.assertEqual(
+            mock_get.call_args.kwargs["params"]["query"],
+            "Wheat Flour India product highlight agro product",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

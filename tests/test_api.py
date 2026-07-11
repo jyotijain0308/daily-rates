@@ -545,6 +545,123 @@ class TestPPTDailyRatesAPI(unittest.TestCase):
             self.assertIn('/api/products/image/unit_test_image_upload.jpg', data['image_url'])
             self.assertTrue((Path(tmpdir) / 'assets/products/unit_test_image_upload.jpg').exists())
 
+    def test_fetch_product_image_from_pexels_updates_product_image(self):
+        create_response = self.client.post('/api/products/', json={
+            'serial_no': 1,
+            'country_of_origin': 'India',
+            'shipment_by': 'Air',
+            'product_name': 'Pexels Fetch Product',
+            'weight_kg': 25,
+            'packing': 'Bag',
+            'price_aed': 72.50,
+        })
+        self.assertEqual(create_response.status_code, 201)
+        product_id = create_response.get_json()['data']['id']
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            from app.routes import product_routes
+
+            previous_assets_root = product_routes.product_image_service.assets_root
+            product_routes.product_image_service.assets_root = Path(tmpdir)
+            output_path = Path(tmpdir) / 'assets/products/pexels_fetch_product.jpg'
+            output_path.parent.mkdir(parents=True)
+            Image.new("RGB", (8, 8), "blue").save(output_path, format="JPEG")
+
+            try:
+                with patch.object(
+                    product_routes.product_image_service,
+                    'fetch_product_image',
+                    return_value='assets/products/pexels_fetch_product.jpg',
+                ):
+                    response = self.client.post(f'/api/products/{product_id}/image/pexels')
+            finally:
+                product_routes.product_image_service.assets_root = previous_assets_root
+
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()['data']
+        self.assertIn('/api/products/image/pexels_fetch_product.jpg', data['image_url'])
+
+    def test_search_product_images_from_pexels_returns_options(self):
+        create_response = self.client.post('/api/products/', json={
+            'serial_no': 1,
+            'country_of_origin': 'India',
+            'shipment_by': 'Air',
+            'product_name': 'Pexels Search Product',
+            'weight_kg': 25,
+            'packing': 'Bag',
+            'price_aed': 72.50,
+        })
+        self.assertEqual(create_response.status_code, 201)
+        product_id = create_response.get_json()['data']['id']
+
+        from app.routes import product_routes
+
+        with patch.object(
+            product_routes.product_image_service,
+            'search_product_images',
+            return_value=[{
+                'image_url': 'https://images.pexels.com/photos/product.jpg',
+                'thumb_url': 'https://images.pexels.com/photos/product_tiny.jpg',
+                'alt': 'Product image',
+                'photographer': 'Test Photographer',
+            }],
+        ) as mock_search:
+            response = self.client.post(
+                f'/api/products/{product_id}/image/pexels/search',
+                json={'description': 'Pexels Search Product India', 'page': 3},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()['data']
+        self.assertEqual(len(data), 1)
+        self.assertEqual(data[0]['thumb_url'], 'https://images.pexels.com/photos/product_tiny.jpg')
+        mock_search.assert_called_once_with(
+            'Pexels Search Product',
+            'India',
+            description='Pexels Search Product India',
+            page=3,
+            per_page=5,
+        )
+
+    def test_select_product_image_from_pexels_updates_product_image(self):
+        create_response = self.client.post('/api/products/', json={
+            'serial_no': 1,
+            'country_of_origin': 'India',
+            'shipment_by': 'Air',
+            'product_name': 'Pexels Select Product',
+            'weight_kg': 25,
+            'packing': 'Bag',
+            'price_aed': 72.50,
+        })
+        self.assertEqual(create_response.status_code, 201)
+        product_id = create_response.get_json()['data']['id']
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            from app.routes import product_routes
+
+            previous_assets_root = product_routes.product_image_service.assets_root
+            product_routes.product_image_service.assets_root = Path(tmpdir)
+            output_path = Path(tmpdir) / 'assets/products/pexels_select_product.jpg'
+            output_path.parent.mkdir(parents=True)
+            Image.new("RGB", (8, 8), "blue").save(output_path, format="JPEG")
+
+            try:
+                with patch.object(
+                    product_routes.product_image_service,
+                    'save_product_image_from_url',
+                    return_value='assets/products/pexels_select_product.jpg',
+                ):
+                    response = self.client.post(
+                        f'/api/products/{product_id}/image/pexels/select',
+                        json={'image_url': 'https://images.pexels.com/photos/product.jpg'},
+                    )
+            finally:
+                product_routes.product_image_service.assets_root = previous_assets_root
+
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()['data']
+        self.assertIn('/api/products/image/pexels_select_product.jpg', data['image_url'])
+
     def test_manual_product_update_records_rate_history(self):
         create_response = self.client.post('/api/products/', json={
             'serial_no': 1,

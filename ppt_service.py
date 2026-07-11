@@ -18,6 +18,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 from src.video_generator import MP4Generator
 from src.exchange_rates import ExchangeRateService
 from src.product_data import ProductData
+from src.product_image_service import ProductImageService
+from src import config
 from src.config import COUNTRY_CURRENCY_CODES
 from models import Product, GenerationHistory
 from wsgi import db
@@ -25,12 +27,16 @@ from wsgi import db
 logger = logging.getLogger(__name__)
 
 
+class GenerationCancelled(Exception):
+    """Raised when an MP4 generation job is cancelled."""
+
+
 class PPTGenerationService:
     """Service to generate MP4 videos from database products."""
     
     @staticmethod
     def generate_ppt(products_list=None, custom_filename=None, country_filter=None,
-                     shipment_filter=None, output_format='mp4'):
+                     shipment_filter=None, output_format='mp4', is_cancelled=None):
         """
         Generate MP4 from products.
         
@@ -42,6 +48,7 @@ class PPTGenerationService:
             (success: bool, result: dict, error_msg: str)
         """
         try:
+            is_cancelled = is_cancelled or (lambda: False)
             # Fetch products if not provided
             output_format = 'mp4'
 
@@ -91,6 +98,15 @@ class PPTGenerationService:
             generated_files = []
 
             for country, country_products in sorted(products_by_country.items()):
+                PPTGenerationService._raise_if_cancelled(is_cancelled)
+                logger.info(
+                    "Generating MP4 for %s / %s with %s products",
+                    country,
+                    shipment_filter or country_products[0].get('shipment_by') or '-',
+                    len(country_products),
+                )
+                PPTGenerationService._prefetch_missing_product_images(country_products, is_cancelled=is_cancelled)
+                PPTGenerationService._raise_if_cancelled(is_cancelled)
                 generator = MP4Generator()
                 # PPT generation is disabled for now.
                 # generator = PPTGenerator()
@@ -102,6 +118,7 @@ class PPTGenerationService:
                 )
 
                 for idx, product_data in enumerate(country_products, 1):
+                    PPTGenerationService._raise_if_cancelled(is_cancelled)
                     product_obj = ProductData(
                         serial_no=product_data['serial_no'],
                         country_of_origin=product_data['country_of_origin'],
@@ -131,7 +148,9 @@ class PPTGenerationService:
                     output_path = os.path.join('output', f'{slug}_products_price_list_{timestamp}.{extension}')
 
                 os.makedirs(os.path.dirname(output_path) or '.', exist_ok=True)
-                generator.save(output_path)
+                logger.info("Writing MP4 file: %s", output_path)
+                generator.save(output_path, is_cancelled=is_cancelled)
+                logger.info("Finished MP4 file: %s", output_path)
                 PPTGenerationService._record_generation(output_path, len(country_products), 'success')
 
                 generated_files.append({
@@ -158,6 +177,15 @@ class PPTGenerationService:
             logger.info(f"✓ Generated {len(generated_files)} country {output_format.upper()} files")
             return True, result, ""
         
+        except GenerationCancelled:
+            raise
+        except RuntimeError as e:
+            if "cancelled" in str(e).lower():
+                raise GenerationCancelled("MP4 generation cancelled")
+            error_msg = f"PPT generation failed: {str(e)}"
+            logger.error(f"✗ {error_msg}")
+            PPTGenerationService._record_generation('', 0, 'failed', str(e))
+            return False, {}, error_msg
         except Exception as e:
             error_msg = f"PPT generation failed: {str(e)}"
             logger.error(f"✗ {error_msg}")
@@ -166,6 +194,41 @@ class PPTGenerationService:
             PPTGenerationService._record_generation('', 0, 'failed', str(e))
             
             return False, {}, error_msg
+
+    @staticmethod
+    def _prefetch_missing_product_images(country_products, is_cancelled=None):
+        """Fetch missing product images once before video rendering."""
+        is_cancelled = is_cancelled or (lambda: False)
+        if not getattr(config, "PRODUCT_IMAGE_PREFETCH_ON_GENERATE", True):
+            logger.info("Product image prefetch is disabled")
+            return
+
+        image_service = ProductImageService()
+        prefetch_limit = getattr(config, "PRODUCT_IMAGE_PREFETCH_LIMIT", 20)
+        fetched_attempts = 0
+
+        for product_data in country_products:
+            PPTGenerationService._raise_if_cancelled(is_cancelled)
+            product_name = product_data.get('product_name')
+            country = product_data.get('country_of_origin')
+            if not product_name:
+                continue
+
+            if image_service.get_product_image_path(product_name, country, fetch_if_missing=False):
+                continue
+
+            if prefetch_limit and fetched_attempts >= prefetch_limit:
+                logger.info("Product image prefetch limit reached: %s", prefetch_limit)
+                return
+
+            fetched_attempts += 1
+            logger.info("Prefetching missing product image: %s", product_name)
+            image_service.get_product_image_path(product_name, country, fetch_if_missing=True)
+
+    @staticmethod
+    def _raise_if_cancelled(is_cancelled):
+        if is_cancelled and is_cancelled():
+            raise GenerationCancelled("MP4 generation cancelled")
 
     @staticmethod
     def _slugify(value: str) -> str:

@@ -26,7 +26,7 @@ class MP4Generator:
     SECONDS_PER_SLIDE = 3
 
     def __init__(self):
-        self.frames = []
+        self.slides = []
         self.font_regular = self._font(34)
         self.font_small = self._font(24)
         self.font_heading = self._font(46)
@@ -133,7 +133,11 @@ class MP4Generator:
         return Image.new("RGBA", (self.WIDTH, self.HEIGHT), self._rgb(background) + (255,))
 
     def _product_image_path(self, product_name: str, country_of_origin: Optional[str] = None) -> Optional[str]:
-        return self.product_images.get_product_image_path(product_name, country_of_origin)
+        return self.product_images.get_product_image_path(
+            product_name,
+            country_of_origin,
+            fetch_if_missing=False,
+        )
 
     def _paste_fit_image_or_text(self, image, draw, image_path, fallback_text, box, text_fill):
         left, top, width, height = box
@@ -153,9 +157,7 @@ class MP4Generator:
         self._draw_centered_text(draw, fallback_text, self.font_small, top + height / 2 - 15, text_fill, width)
 
     def _append_slide(self, frame):
-        rgb_frame = frame.convert("RGB")
-        for _ in range(self.SECONDS_PER_SLIDE * self.FPS):
-            self.frames.append(np.asarray(rgb_frame))
+        self.slides.append(frame.convert("RGB"))
 
     def add_country_title_slide(self, country_name: str, current_date: datetime = None,
                                 shipment_by: Optional[str] = None):
@@ -179,7 +181,7 @@ class MP4Generator:
         if shipment_by:
             self._draw_centered_text(
                 draw, f"Shipment by: {shipment_by}",
-                self.font_heading, 500, self._rgb("accent"), self.WIDTH - 140
+                self.font_regular, 512, self._rgb("accent"), self.WIDTH - 180
             )
             date_y = 590
         else:
@@ -263,9 +265,14 @@ class MP4Generator:
         self._draw_centered_text(draw, COMPANY_WEBSITE, self.font_regular, website_y, self._rgb("accent"), self.WIDTH - 120)
         self._append_slide(frame)
 
-    def save(self, file_path: str):
+    def save(self, file_path: str, is_cancelled=None):
+        is_cancelled = is_cancelled or (lambda: False)
         Path(file_path).parent.mkdir(parents=True, exist_ok=True)
         with imageio.get_writer(file_path, fps=self.FPS, codec="libx264", quality=8) as writer:
-            for frame in self.frames:
-                writer.append_data(frame)
+            for slide in self.slides:
+                frame = np.asarray(slide)
+                for _ in range(self.SECONDS_PER_SLIDE * self.FPS):
+                    if is_cancelled():
+                        raise RuntimeError("MP4 generation cancelled")
+                    writer.append_data(frame)
         logger.info("MP4 saved to %s", file_path)

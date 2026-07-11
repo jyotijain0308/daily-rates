@@ -27,6 +27,7 @@ A Python-based system that automatically generates professional PowerPoint prese
 - Inline product editing
 - One-click MP4 generation, preview, and download
 - In-browser MP4 preview before download
+- Background MP4 generation with cancellation support
 - Responsive design for desktop and mobile
 
 **Exchange Rate Integration**
@@ -162,7 +163,7 @@ To stop the server, press `Ctrl+C` in the terminal.
 
 1. **Import** — Upload a CSV file or table image, review created/updated/skipped counts and old-vs-new rate differences, then confirm the save
 2. **Manage** — Edit rates inline (double-click a cell), use the Add/Edit modal, or export the full rate sheet from Products
-3. **Generate** — Select a country and shipment method, then click Generate MP4
+3. **Generate** — Select a country and shipment method, then click Generate MP4. You can cancel an in-progress generation from the same page.
 4. **Preview/Download** — Preview the generated MP4 in the browser, then download the country-specific video from the Generate page or Dashboard history
 
 To update rates in bulk, open **Products**, click **Export Rate Sheet**, update the `Price in AED` values in the downloaded CSV, then upload that CSV on the **Import** page. Existing products are updated by `Product Name` + `Country of origin`. The import preview highlights rate changes of 20% or more before you confirm.
@@ -339,7 +340,7 @@ COMPANY_NAME = "Your Company Ltd."
 COMPANY_ADDRESS = "Dubai, United Arab Emirates"
 COMPANY_WEBSITE = "https://www.example.com"
 COMPANY_LOGO_IMAGE = "assets/company_logo.png"
-UAE_LOGO_IMAGE = "assets/uae_logo.png"
+UAE_LOGO_IMAGE = "assets/uae_logo.jpg"
 ```
 
 Country logo paths are configured in `COUNTRY_LOGO_IMAGES`. If a configured image file is missing, the PPT uses a text placeholder instead of failing.
@@ -434,7 +435,7 @@ Example CLI log output:
 ```python
 # In src/config.py
 COUNTRY_CURRENCY_CODES["India"] = "INR"
-COUNTRY_LOGO_IMAGES["India"] = "assets/countries/india.png"
+COUNTRY_LOGO_IMAGES["India"] = "assets/countries/india.jpg"
 ```
 
 ### Change Output File Location

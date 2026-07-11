@@ -1,4 +1,5 @@
 const generateBtn = document.getElementById('generateBtn');
+const cancelGenerateBtn = document.getElementById('cancelGenerateBtn');
 const downloadBtn = document.getElementById('downloadBtn');
 const progressWrap = document.getElementById('progressWrap');
 const progressFill = document.getElementById('progressFill');
@@ -18,8 +19,11 @@ const previewDownloadBtn = document.getElementById('previewDownloadBtn');
 
 let latestFilename = null;
 let shipmentsByCountry = {};
+let activeJobId = null;
+let jobPollTimer = null;
 
 generateBtn.addEventListener('click', generatePpt);
+cancelGenerateBtn.addEventListener('click', cancelGeneration);
 countrySelect.addEventListener('change', () => {
     populateShipmentOptions(countrySelect.value);
     updateGenerateState();
@@ -77,11 +81,12 @@ async function generatePpt() {
     }
 
     generateBtn.disabled = true;
+    cancelGenerateBtn.style.display = 'inline-flex';
     downloadBtn.style.display = 'none';
     progressWrap.style.display = 'block';
     statusIcon.textContent = '⏳';
     statusTitle.textContent = 'Generating...';
-    statusMessage.textContent = 'Please wait while your presentation is being created.';
+    statusMessage.textContent = 'Please wait while your MP4 video is being created.';
 
     animateProgress();
 
@@ -90,74 +95,143 @@ async function generatePpt() {
             country: selectedCountry,
             shipment_by: selectedShipment,
         });
-        completeProgress();
-
-        latestFilename = result.data.filename;
-        statusIcon.textContent = '🎉';
-        statusTitle.textContent = 'Generation Complete!';
+        activeJobId = result.data.job_id;
         statusMessage.textContent = result.message;
-
-        downloadBtn.style.display = 'inline-flex';
-        downloadBtn.href = API.downloadUrl(result.data.filename);
-        showMp4Preview(result.data.filename);
-
-        latestSection.style.display = 'block';
-        const files = result.data.files || [result.data];
-        latestInfo.innerHTML = `
-            <div><strong>Files:</strong> ${files.length}</div>
-            <div><strong>Products:</strong> ${result.data.product_count}</div>
-            <div><strong>Shipment by:</strong> ${escapeHtml(result.data.shipment_by || selectedShipment)}</div>
-            <div class="table-wrap" style="margin-top: 1rem;">
-                <table class="data-table">
-                    <thead>
-                        <tr>
-                            <th>Country</th>
-                            <th>Format</th>
-                            <th>Shipment by</th>
-                            <th>Products</th>
-                            <th>File</th>
-                            <th>Preview</th>
-                            <th>Download</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${files.map(file => `
-                            <tr>
-                                <td>${escapeHtml(file.country || 'Products')}</td>
-                                <td>${escapeHtml((file.format || 'mp4').toUpperCase())}</td>
-                                <td>${escapeHtml(file.shipment_by || selectedShipment)}</td>
-                                <td>${file.product_count || '—'}</td>
-                                <td>${escapeHtml(file.filename)}</td>
-                                <td>${isMp4(file.filename) ? `<button type="button" class="btn btn-sm btn-secondary preview-file-btn" data-filename="${escapeHtml(file.filename)}">Preview</button>` : '—'}</td>
-                                <td><a href="${API.downloadUrl(file.filename)}" class="btn btn-sm btn-secondary">Download</a></td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
-            </div>
-        `;
-        latestInfo.querySelectorAll('.preview-file-btn').forEach(btn => {
-            btn.addEventListener('click', () => showMp4Preview(btn.dataset.filename));
-        });
-
-        showSuccess('MP4 generated successfully!');
-        await loadHistory();
+        pollGenerationJob(activeJobId, selectedShipment);
     } catch (err) {
         statusIcon.textContent = '❌';
         statusTitle.textContent = 'Generation Failed';
         statusMessage.textContent = err.message;
         showError(err.message);
-    } finally {
-        updateGenerateState();
-        setTimeout(() => {
-            progressWrap.style.display = 'none';
-            progressFill.style.width = '0%';
-        }, 1000);
     }
 }
 
+async function pollGenerationJob(jobId, selectedShipment) {
+    clearTimeout(jobPollTimer);
+    try {
+        const result = await API.getGenerationJob(jobId);
+        const job = result.data;
+        statusMessage.textContent = job.message || 'Generating MP4...';
+
+        if (job.status === 'completed') {
+            completeProgress();
+            activeJobId = null;
+            cancelGenerateBtn.style.display = 'none';
+            updateGenerateState();
+            setTimeout(() => {
+                progressWrap.style.display = 'none';
+                progressFill.style.width = '0%';
+            }, 1000);
+            handleGenerationComplete(job.result, selectedShipment);
+            return;
+        }
+
+        if (job.status === 'cancelled') {
+            activeJobId = null;
+            cancelGenerateBtn.style.display = 'none';
+            progressWrap.style.display = 'none';
+            progressFill.style.width = '0%';
+            statusIcon.textContent = '⏹';
+            statusTitle.textContent = 'Generation Cancelled';
+            statusMessage.textContent = job.message || 'MP4 generation was cancelled.';
+            updateGenerateState();
+            showWarning('MP4 generation cancelled');
+            return;
+        }
+
+        if (job.status === 'failed') {
+            activeJobId = null;
+            cancelGenerateBtn.style.display = 'none';
+            progressWrap.style.display = 'none';
+            progressFill.style.width = '0%';
+            statusIcon.textContent = '❌';
+            statusTitle.textContent = 'Generation Failed';
+            statusMessage.textContent = job.error || job.message || 'Generation failed';
+            updateGenerateState();
+            showError(statusMessage.textContent);
+            return;
+        }
+
+        jobPollTimer = setTimeout(() => pollGenerationJob(jobId, selectedShipment), 2000);
+    } catch (err) {
+        statusIcon.textContent = '❌';
+        statusTitle.textContent = 'Generation Status Failed';
+        statusMessage.textContent = err.message;
+        cancelGenerateBtn.style.display = 'none';
+        updateGenerateState();
+        showError(err.message);
+    }
+}
+
+async function cancelGeneration() {
+    if (!activeJobId) return;
+
+    cancelGenerateBtn.disabled = true;
+    try {
+        await API.cancelGenerationJob(activeJobId);
+        statusMessage.textContent = 'Cancellation requested...';
+    } catch (err) {
+        showError(err.message);
+    } finally {
+        cancelGenerateBtn.disabled = false;
+    }
+}
+
+async function handleGenerationComplete(data, selectedShipment) {
+    latestFilename = data.filename;
+    statusIcon.textContent = '🎉';
+    statusTitle.textContent = 'Generation Complete!';
+    statusMessage.textContent = 'MP4 generated successfully.';
+
+    downloadBtn.style.display = 'inline-flex';
+    downloadBtn.href = API.downloadUrl(data.filename);
+    showMp4Preview(data.filename);
+
+    latestSection.style.display = 'block';
+    const files = data.files || [data];
+    latestInfo.innerHTML = `
+        <div><strong>Files:</strong> ${files.length}</div>
+        <div><strong>Products:</strong> ${data.product_count}</div>
+        <div><strong>Shipment by:</strong> ${escapeHtml(data.shipment_by || selectedShipment)}</div>
+        <div class="table-wrap" style="margin-top: 1rem;">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Country</th>
+                        <th>Format</th>
+                        <th>Shipment by</th>
+                        <th>Products</th>
+                        <th>File</th>
+                        <th>Preview</th>
+                        <th>Download</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${files.map(file => `
+                        <tr>
+                            <td>${escapeHtml(file.country || 'Products')}</td>
+                            <td>${escapeHtml((file.format || 'mp4').toUpperCase())}</td>
+                            <td>${escapeHtml(file.shipment_by || selectedShipment)}</td>
+                            <td>${file.product_count || '—'}</td>
+                            <td>${escapeHtml(file.filename)}</td>
+                            <td>${isMp4(file.filename) ? `<button type="button" class="btn btn-sm btn-secondary preview-file-btn" data-filename="${escapeHtml(file.filename)}">Preview</button>` : '—'}</td>
+                            <td><a href="${API.downloadUrl(file.filename)}" class="btn btn-sm btn-secondary">Download</a></td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+    latestInfo.querySelectorAll('.preview-file-btn').forEach(btn => {
+        btn.addEventListener('click', () => showMp4Preview(btn.dataset.filename));
+    });
+
+    showSuccess('MP4 generated successfully!');
+    await loadHistory();
+}
+
 function updateGenerateState() {
-    generateBtn.disabled = !countrySelect.value || !shipmentSelect.value || countrySelect.disabled || shipmentSelect.disabled;
+    generateBtn.disabled = Boolean(activeJobId) || !countrySelect.value || !shipmentSelect.value || countrySelect.disabled || shipmentSelect.disabled;
     generateBtn.textContent = 'Generate MP4';
 }
 
@@ -189,7 +263,7 @@ function animateProgress() {
         if (width > 30 && width < 60) {
             progressText.textContent = 'Building product slides...';
         } else if (width >= 60) {
-            progressText.textContent = 'Finalizing presentation...';
+            progressText.textContent = 'Finalizing MP4 video...';
         }
     }, 300);
 

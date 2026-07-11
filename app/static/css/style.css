@@ -778,6 +778,64 @@ a:hover {
     background: var(--bg);
 }
 
+.image-preview-empty {
+    min-height: 220px;
+    align-items: center;
+    justify-content: center;
+    border: 1px dashed var(--border);
+    border-radius: 6px;
+    background: var(--bg);
+    color: var(--text-muted);
+}
+
+.pexels-search-panel {
+    margin-top: 1rem;
+    display: grid;
+    gap: 0.75rem;
+}
+
+.pexels-search-panel label {
+    font-weight: 600;
+    color: var(--text);
+}
+
+.pexels-image-options {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+    gap: 0.75rem;
+}
+
+.pexels-image-option {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface);
+    overflow: hidden;
+    display: grid;
+    gap: 0.5rem;
+    padding: 0.5rem;
+}
+
+.pexels-image-option img {
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    object-fit: cover;
+    border-radius: 4px;
+    background: var(--bg);
+}
+
+.pexels-image-option .btn {
+    width: 100%;
+}
+
+.pexels-image-credit {
+    min-height: 1rem;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 /* Toast notifications */
 .toast-container {
     position: fixed;

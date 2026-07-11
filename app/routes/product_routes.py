@@ -91,6 +91,112 @@ def update_product_image(product_id):
         }), 500
 
 
+@product_bp.route('/<int:product_id>/image/pexels', methods=['POST'])
+def fetch_product_image_from_pexels(product_id):
+    """Fetch or refresh a product image from Pexels."""
+    try:
+        product = Product.query.get_or_404(product_id)
+        image_path = product_image_service.fetch_product_image(
+            product.product_name,
+            product.country_of_origin,
+        )
+
+        if not image_path:
+            return jsonify({
+                'status': 'error',
+                'message': 'Could not fetch an image from Pexels. Check PEXELS_API_KEY or try another product name.'
+            }), 404
+
+        return jsonify({
+            'status': 'success',
+            'message': 'Product image fetched from Pexels',
+            'data': product_to_dict(product)
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Error fetching Pexels image for product {product_id}: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': f"Error fetching Pexels image: {str(e)}"
+        }), 500
+
+
+@product_bp.route('/<int:product_id>/image/pexels/search', methods=['POST'])
+def search_product_images_from_pexels(product_id):
+    """Search Pexels for selectable product image candidates."""
+    try:
+        product = Product.query.get_or_404(product_id)
+        payload = request.get_json(silent=True) or {}
+        description = (payload.get('description') or '').strip()
+        page = payload.get('page') or 1
+
+        images = product_image_service.search_product_images(
+            product.product_name,
+            product.country_of_origin,
+            description=description,
+            page=page,
+            per_page=5,
+        )
+
+        if not images:
+            return jsonify({
+                'status': 'error',
+                'message': 'No matching Pexels images found. Try a different description.'
+            }), 404
+
+        return jsonify({
+            'status': 'success',
+            'message': 'Pexels image options loaded',
+            'data': images
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Error searching Pexels images for product {product_id}: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': f"Error searching Pexels images: {str(e)}"
+        }), 500
+
+
+@product_bp.route('/<int:product_id>/image/pexels/select', methods=['POST'])
+def select_product_image_from_pexels(product_id):
+    """Save a selected Pexels image for a product."""
+    try:
+        product = Product.query.get_or_404(product_id)
+        payload = request.get_json(silent=True) or {}
+        image_url = (payload.get('image_url') or '').strip()
+
+        if not image_url:
+            return jsonify({
+                'status': 'error',
+                'message': 'No Pexels image URL selected'
+            }), 400
+
+        image_path = product_image_service.save_product_image_from_url(
+            product.product_name,
+            image_url,
+        )
+
+        if not image_path:
+            return jsonify({
+                'status': 'error',
+                'message': 'Could not save the selected Pexels image.'
+            }), 400
+
+        return jsonify({
+            'status': 'success',
+            'message': 'Product image updated from Pexels',
+            'data': product_to_dict(product)
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Error saving selected Pexels image for product {product_id}: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': f"Error saving selected Pexels image: {str(e)}"
+        }), 500
+
+
 @product_bp.route('/', methods=['GET'])
 def get_all_products():
     """Get all products"""

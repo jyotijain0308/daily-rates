@@ -58,6 +58,26 @@ const API = {
         });
     },
 
+    fetchProductImageFromPexels(id) {
+        return this.request(`/api/products/${id}/image/pexels`, {
+            method: 'POST',
+        });
+    },
+
+    searchProductImagesFromPexels(id, options = {}) {
+        return this.request(`/api/products/${id}/image/pexels/search`, {
+            method: 'POST',
+            body: JSON.stringify(options),
+        });
+    },
+
+    selectProductImageFromPexels(id, imageUrl) {
+        return this.request(`/api/products/${id}/image/pexels/select`, {
+            method: 'POST',
+            body: JSON.stringify({ image_url: imageUrl }),
+        });
+    },
+
     deleteProduct(id) {
         return this.request(`/api/products/${id}`, { method: 'DELETE' });
     },
@@ -108,6 +128,16 @@ const API = {
         return this.request('/api/generation/generate', {
             method: 'POST',
             body: JSON.stringify(options),
+        });
+    },
+
+    getGenerationJob(jobId) {
+        return this.request(`/api/generation/jobs/${encodeURIComponent(jobId)}`);
+    },
+
+    cancelGenerationJob(jobId) {
+        return this.request(`/api/generation/jobs/${encodeURIComponent(jobId)}/cancel`, {
+            method: 'POST',
         });
     },
 

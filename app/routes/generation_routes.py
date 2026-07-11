@@ -3,7 +3,8 @@ PPT Generation and Download API routes
 """
 import logging
 import os
-from flask import Blueprint, jsonify, request, send_file
+from flask import Blueprint, current_app, jsonify, request, send_file
+from generation_jobs import create_job, read_job, request_cancel, start_generation_job
 from models import Product, GenerationHistory
 from ppt_service import PPTGenerationService
 from wsgi import db
@@ -44,24 +45,14 @@ def generate_ppt():
                 'message': 'No products found for the selected country and shipment method.'
             }), 400
         
-        success, result, error_msg = PPTGenerationService.generate_ppt(
-            country_filter=country,
-            shipment_filter=shipment_by,
-            output_format=output_format,
-        )
-        
-        if success:
-            logger.info(f"✓ File generated: {result['filename']}")
-            return jsonify({
-                'status': 'success',
-                'message': f"Generated {output_format.upper()} for {country} / {shipment_by} with {product_count} products",
-                'data': result
-            }), 200
-        else:
-            return jsonify({
-                'status': 'error',
-                'message': error_msg
-            }), 500
+        job = create_job(country, shipment_by, product_count)
+        start_generation_job(current_app._get_current_object(), job['job_id'], country, shipment_by)
+
+        return jsonify({
+            'status': 'accepted',
+            'message': f"Started {output_format.upper()} generation for {country} / {shipment_by}",
+            'data': job,
+        }), 202
     
     except Exception as e:
         logger.error(f"Error generating file: {str(e)}")
@@ -69,6 +60,37 @@ def generate_ppt():
             'status': 'error',
             'message': f'Error generating file: {str(e)}'
         }), 500
+
+
+@generation_bp.route('/jobs/<job_id>', methods=['GET'])
+def get_generation_job(job_id):
+    """Get status for a background MP4 generation job."""
+    job = read_job(job_id)
+    if not job:
+        return jsonify({
+            'status': 'error',
+            'message': 'Generation job not found'
+        }), 404
+
+    return jsonify({
+        'status': 'success',
+        'data': job,
+    }), 200
+
+
+@generation_bp.route('/jobs/<job_id>/cancel', methods=['POST'])
+def cancel_generation_job(job_id):
+    """Request cancellation for a running MP4 generation job."""
+    if not request_cancel(job_id):
+        return jsonify({
+            'status': 'error',
+            'message': 'Generation job not found'
+        }), 404
+
+    return jsonify({
+        'status': 'success',
+        'message': 'Cancellation requested',
+    }), 200
 
 
 @generation_bp.route('/latest', methods=['GET'])

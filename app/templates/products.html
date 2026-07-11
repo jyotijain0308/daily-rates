@@ -99,8 +99,20 @@
             <button type="button" class="modal-close" id="closeImagePreviewBtn">&times;</button>
         </div>
         <img id="imagePreviewImg" class="image-preview-img" src="" alt="">
+        <div id="imagePreviewEmpty" class="image-preview-empty" style="display:none;">No image selected</div>
+        <div class="pexels-search-panel">
+            <label for="pexelsImageDescription">Pexels search description</label>
+            <input
+                type="text"
+                id="pexelsImageDescription"
+                class="input"
+                placeholder="Product name and country"
+            >
+            <div id="pexelsImageOptions" class="pexels-image-options" style="display:none;"></div>
+        </div>
         <div class="form-actions">
-            <button type="button" class="btn btn-secondary" id="replaceImageBtn">Update Image</button>
+            <button type="button" class="btn btn-secondary" id="replaceImageBtn">Browse Image</button>
+            <button type="button" class="btn btn-primary" id="fetchPexelsImageBtn">Fetch from Pexels</button>
         </div>
     </div>
 </div>

@@ -13,7 +13,7 @@ COMPANY_DEFAULT_COUNTRY = "United Arab Emirates"
 COMPANY_ADDRESS = "Office #1835, One by Omniyat, Business Bay, Dubai, United Arab Emirates"
 COMPANY_WEBSITE = "https://www.easternfarmsllc.com"
 COMPANY_LOGO_IMAGE = "assets/company_logo.png"
-UAE_LOGO_IMAGE = "assets/uae_logo.png"
+UAE_LOGO_IMAGE = "assets/uae_logo.jpg"
 PRODUCT_IMAGES_DIR = "assets/products"
 
 # Product image search API Configuration
@@ -24,7 +24,9 @@ PEXELS_API_KEY = os.getenv(
 PEXELS_API_URL = "https://api.pexels.com/v1/search"
 PRODUCT_IMAGE_PROVIDER = "pexels"
 PRODUCT_IMAGE_AUTO_FETCH = os.getenv("PRODUCT_IMAGE_AUTO_FETCH", "true").lower() == "true"
-PRODUCT_IMAGE_FETCH_TIMEOUT_SECONDS = 10
+PRODUCT_IMAGE_FETCH_TIMEOUT_SECONDS = int(os.getenv("PRODUCT_IMAGE_FETCH_TIMEOUT_SECONDS", "5"))
+PRODUCT_IMAGE_PREFETCH_ON_GENERATE = os.getenv("PRODUCT_IMAGE_PREFETCH_ON_GENERATE", "true").lower() == "true"
+PRODUCT_IMAGE_PREFETCH_LIMIT = int(os.getenv("PRODUCT_IMAGE_PREFETCH_LIMIT", "20"))
 PRODUCT_IMAGE_SEARCH_CATEGORY = "fruits, vegetables or spices"
 PRODUCT_IMAGE_MAX_WIDTH = 1200
 PRODUCT_IMAGE_MAX_HEIGHT = 800
@@ -115,14 +117,14 @@ COUNTRY_CURRENCY_CODES = {
 }
 
 COUNTRY_LOGO_IMAGES = {
-    "India": "assets/countries/india.png",
-    "United States": "assets/countries/united_states.png",
-    "Brazil": "assets/countries/brazil.png",
-    "Thailand": "assets/countries/thailand.png",
-    "Vietnam": "assets/countries/vietnam.png",
-    "Australia": "assets/countries/australia.png",
-    "Canada": "assets/countries/canada.png",
-    "China": "assets/countries/china.png",
+    "India": "assets/countries/india.jpg",
+    "United States": "assets/countries/united_states.jpg",
+    "Brazil": "assets/countries/brazil.jpg",
+    "Thailand": "assets/countries/thailand.jpg",
+    "Vietnam": "assets/countries/vietnam.jpg",
+    "Australia": "assets/countries/australia.jpg",
+    "Canada": "assets/countries/canada.jpg",
+    "China": "assets/countries/china.jpg",
 }
 
 # Slide Layout Settings

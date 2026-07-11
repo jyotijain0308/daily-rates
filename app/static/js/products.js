@@ -8,9 +8,16 @@ const productForm = document.getElementById('productForm');
 const imagePreviewModal = document.getElementById('imagePreviewModal');
 const imagePreviewImg = document.getElementById('imagePreviewImg');
 const imagePreviewTitle = document.getElementById('imagePreviewTitle');
+const imagePreviewEmpty = document.getElementById('imagePreviewEmpty');
 const productImageInput = document.getElementById('productImageInput');
 const replaceImageBtn = document.getElementById('replaceImageBtn');
+const fetchPexelsImageBtn = document.getElementById('fetchPexelsImageBtn');
+const pexelsImageDescription = document.getElementById('pexelsImageDescription');
+const pexelsImageOptions = document.getElementById('pexelsImageOptions');
 let selectedImageProductId = null;
+let pexelsSearchPage = 1;
+let currentPexelsCandidates = [];
+let lastPexelsDescription = '';
 
 document.getElementById('addProductBtn').addEventListener('click', () => openModal());
 document.getElementById('closeModalBtn').addEventListener('click', closeModal);
@@ -19,6 +26,7 @@ document.getElementById('closeImagePreviewBtn').addEventListener('click', closeI
 replaceImageBtn.addEventListener('click', () => {
     if (selectedImageProductId) openImageUpload(selectedImageProductId);
 });
+fetchPexelsImageBtn.addEventListener('click', fetchProductImageFromPexels);
 productImageInput.addEventListener('change', handleProductImageSelected);
 productForm.addEventListener('submit', handleFormSubmit);
 productSearch.addEventListener('input', renderProducts);
@@ -118,7 +126,10 @@ function renderProducts() {
     });
 
     productsBody.querySelectorAll('.image-btn').forEach(btn => {
-        btn.addEventListener('click', () => openImageUpload(parseInt(btn.dataset.id)));
+        btn.addEventListener('click', () => {
+            const product = products.find(p => p.id === parseInt(btn.dataset.id));
+            if (product) openImagePreview(product);
+        });
     });
 
     productsBody.querySelectorAll('.delete-btn').forEach(btn => {
@@ -127,12 +138,25 @@ function renderProducts() {
 }
 
 function openImagePreview(product) {
-    if (!product.image_url) return;
-
     selectedImageProductId = product.id;
+    resetPexelsOptions();
     imagePreviewTitle.textContent = product.product_name;
-    imagePreviewImg.src = product.image_url;
-    imagePreviewImg.alt = product.product_name;
+    if (pexelsImageDescription) {
+        pexelsImageDescription.value = [product.product_name, product.country_of_origin]
+            .filter(Boolean)
+            .join(' ');
+    }
+    if (product.image_url) {
+        imagePreviewImg.style.display = 'block';
+        imagePreviewEmpty.style.display = 'none';
+        imagePreviewImg.src = product.image_url;
+        imagePreviewImg.alt = product.product_name;
+    } else {
+        imagePreviewImg.style.display = 'none';
+        imagePreviewEmpty.style.display = 'flex';
+        imagePreviewImg.src = '';
+        imagePreviewImg.alt = '';
+    }
     imagePreviewModal.style.display = 'flex';
 }
 
@@ -140,7 +164,22 @@ function closeImagePreview() {
     imagePreviewModal.style.display = 'none';
     imagePreviewImg.src = '';
     imagePreviewImg.alt = '';
+    imagePreviewEmpty.style.display = 'none';
+    resetPexelsOptions();
     selectedImageProductId = null;
+}
+
+function resetPexelsOptions() {
+    pexelsSearchPage = 1;
+    currentPexelsCandidates = [];
+    lastPexelsDescription = '';
+    if (pexelsImageOptions) {
+        pexelsImageOptions.innerHTML = '';
+        pexelsImageOptions.style.display = 'none';
+    }
+    if (fetchPexelsImageBtn) {
+        fetchPexelsImageBtn.textContent = 'Fetch from Pexels';
+    }
 }
 
 function openImageUpload(productId) {
@@ -170,6 +209,80 @@ async function handleProductImageSelected(e) {
         showSuccess('Product image updated');
     } catch (err) {
         showError(err.message);
+    }
+}
+
+async function fetchProductImageFromPexels() {
+    if (!selectedImageProductId) return;
+
+    fetchPexelsImageBtn.disabled = true;
+    fetchPexelsImageBtn.textContent = 'Fetching...';
+
+    try {
+        const description = pexelsImageDescription?.value || '';
+        if (description !== lastPexelsDescription) {
+            pexelsSearchPage = 1;
+        }
+
+        const result = await API.searchProductImagesFromPexels(selectedImageProductId, {
+            description,
+            page: pexelsSearchPage,
+        });
+        currentPexelsCandidates = result.data || [];
+        renderPexelsOptions(currentPexelsCandidates);
+        lastPexelsDescription = description;
+        pexelsSearchPage += 1;
+        showSuccess('Select one of the Pexels images');
+    } catch (err) {
+        showError(err.message);
+    } finally {
+        fetchPexelsImageBtn.disabled = false;
+        fetchPexelsImageBtn.textContent = pexelsSearchPage > 1 ? 'Fetch different' : 'Fetch from Pexels';
+    }
+}
+
+function renderPexelsOptions(candidates) {
+    if (!pexelsImageOptions) return;
+
+    if (!candidates.length) {
+        pexelsImageOptions.innerHTML = '';
+        pexelsImageOptions.style.display = 'none';
+        return;
+    }
+
+    pexelsImageOptions.innerHTML = candidates.map((candidate, index) => `
+        <div class="pexels-image-option">
+            <img src="${escapeHtml(candidate.thumb_url || candidate.image_url)}" alt="${escapeHtml(candidate.alt || 'Pexels product image')}">
+            <div class="pexels-image-credit">${candidate.photographer ? `Photo: ${escapeHtml(candidate.photographer)}` : ''}</div>
+            <button type="button" class="btn btn-sm btn-primary pexels-select-btn" data-index="${index}">Use this image</button>
+        </div>
+    `).join('');
+    pexelsImageOptions.style.display = 'grid';
+
+    pexelsImageOptions.querySelectorAll('.pexels-select-btn').forEach(btn => {
+        btn.addEventListener('click', () => selectPexelsImage(parseInt(btn.dataset.index, 10), btn));
+    });
+}
+
+async function selectPexelsImage(index, button) {
+    const candidate = currentPexelsCandidates[index];
+    if (!candidate || !selectedImageProductId) return;
+
+    button.disabled = true;
+    button.textContent = 'Saving...';
+
+    try {
+        const result = await API.selectProductImageFromPexels(selectedImageProductId, candidate.image_url);
+        const idx = products.findIndex(p => p.id === selectedImageProductId);
+        if (idx >= 0) products[idx] = result.data;
+
+        renderProducts();
+        openImagePreview(result.data);
+        showSuccess('Product image updated from Pexels');
+    } catch (err) {
+        showError(err.message);
+        button.disabled = false;
+        button.textContent = 'Use this image';
     }
 }
 
