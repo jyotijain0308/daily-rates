@@ -1,10 +1,14 @@
 """MP4 generator for country-specific product price lists."""
 import logging
+import shutil
+import subprocess
+import tempfile
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
 import imageio.v2 as imageio
+import imageio_ffmpeg
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
@@ -25,7 +29,7 @@ class MP4Generator:
     FPS = 1
     SECONDS_PER_SLIDE = 3
 
-    def __init__(self):
+    def __init__(self, country_logo_images=None):
         self.slides = []
         self.font_regular = self._font(34)
         self.font_small = self._font(24)
@@ -33,6 +37,7 @@ class MP4Generator:
         self.font_title = self._font(62)
         self.font_price = self._font(58)
         self.product_images = ProductImageService()
+        self.country_logo_images = country_logo_images or COUNTRY_LOGO_IMAGES
 
     def _font(self, size: int):
         for candidate in [
@@ -171,7 +176,7 @@ class MP4Generator:
             (64, 43, 1152, 91), self._rgb("primary")
         )
         self._paste_fit_image_centered_or_text(
-            frame, draw, COUNTRY_LOGO_IMAGES.get(country_name), country_name,
+            frame, draw, self.country_logo_images.get(country_name), country_name,
             (64, 187, 1152, 211), self._rgb("primary")
         )
         self._draw_centered_text(
@@ -201,7 +206,7 @@ class MP4Generator:
             120, 32, self._rgb("primary")
         )
         self._paste_fit_image_or_text(
-            frame, draw, COUNTRY_LOGO_IMAGES.get(product.country_of_origin), product.country_of_origin,
+            frame, draw, self.country_logo_images.get(product.country_of_origin), product.country_of_origin,
             (1110, 24, 115, 75), self._rgb("primary")
         )
 
@@ -236,7 +241,7 @@ class MP4Generator:
             (64, 43, 1152, 91), self._rgb("primary")
         )
         self._paste_fit_image_or_text(
-            frame, draw, COUNTRY_LOGO_IMAGES.get(country_name), country_name,
+            frame, draw, self.country_logo_images.get(country_name), country_name,
             (70, 192, 243, 120), self._rgb("primary")
         )
         self._paste_fit_image_or_text(
@@ -265,14 +270,63 @@ class MP4Generator:
         self._draw_centered_text(draw, COMPANY_WEBSITE, self.font_regular, website_y, self._rgb("accent"), self.WIDTH - 120)
         self._append_slide(frame)
 
-    def save(self, file_path: str, is_cancelled=None):
+    def save(self, file_path: str, is_cancelled=None, audio_path: Optional[str] = None):
         is_cancelled = is_cancelled or (lambda: False)
         Path(file_path).parent.mkdir(parents=True, exist_ok=True)
-        with imageio.get_writer(file_path, fps=self.FPS, codec="libx264", quality=8) as writer:
+        video_path = file_path
+        temp_video = None
+        if audio_path:
+            temp_file = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False)
+            temp_video = temp_file.name
+            temp_file.close()
+            video_path = temp_video
+
+        with imageio.get_writer(video_path, fps=self.FPS, codec="libx264", quality=8) as writer:
             for slide in self.slides:
                 frame = np.asarray(slide)
                 for _ in range(self.SECONDS_PER_SLIDE * self.FPS):
                     if is_cancelled():
                         raise RuntimeError("MP4 generation cancelled")
                     writer.append_data(frame)
+
+        if audio_path:
+            try:
+                self._mux_background_audio(temp_video, audio_path, file_path, is_cancelled)
+            finally:
+                Path(temp_video).unlink(missing_ok=True)
         logger.info("MP4 saved to %s", file_path)
+
+    def _mux_background_audio(self, video_path: str, audio_path: str, output_path: str, is_cancelled):
+        audio_file = Path(audio_path)
+        if not audio_file.exists():
+            logger.warning("Background audio file not found: %s", audio_path)
+            shutil.move(video_path, output_path)
+            return
+
+        duration_seconds = max(1, len(self.slides) * self.SECONDS_PER_SLIDE)
+        command = [
+            imageio_ffmpeg.get_ffmpeg_exe(),
+            "-y",
+            "-i", video_path,
+            "-stream_loop", "-1",
+            "-i", str(audio_file),
+            "-t", str(duration_seconds),
+            "-map", "0:v:0",
+            "-map", "1:a:0",
+            "-c:v", "copy",
+            "-c:a", "aac",
+            "-b:a", "128k",
+            "-shortest",
+            output_path,
+        ]
+
+        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        while process.poll() is None:
+            if is_cancelled():
+                process.kill()
+                process.communicate()
+                raise RuntimeError("MP4 generation cancelled")
+        _, stderr = process.communicate()
+        if process.returncode != 0:
+            logger.warning("Could not add background audio: %s", stderr.decode("utf-8", errors="ignore"))
+            shutil.move(video_path, output_path)

@@ -73,17 +73,17 @@ def is_cancel_requested(job_id):
     return _cancel_path(job_id).exists()
 
 
-def start_generation_job(app, job_id, country, shipment_by):
+def start_generation_job(app, job_id, country, shipment_by, audio_path=None):
     thread = threading.Thread(
         target=_run_generation_job,
-        args=(app, job_id, country, shipment_by),
+        args=(app, job_id, country, shipment_by, audio_path),
         daemon=True,
     )
     thread.start()
     return thread
 
 
-def _run_generation_job(app, job_id, country, shipment_by):
+def _run_generation_job(app, job_id, country, shipment_by, audio_path=None):
     with app.app_context():
         try:
             from ppt_service import GenerationCancelled, PPTGenerationService
@@ -93,6 +93,7 @@ def _run_generation_job(app, job_id, country, shipment_by):
                 country_filter=country,
                 shipment_filter=shipment_by,
                 output_format="mp4",
+                background_audio_path=audio_path,
                 is_cancelled=lambda: is_cancel_requested(job_id),
             )
 

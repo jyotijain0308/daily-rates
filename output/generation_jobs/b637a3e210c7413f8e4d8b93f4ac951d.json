@@ -1,0 +1,30 @@
+{
+  "status": "completed",
+  "country": "Bangladesh",
+  "shipment_by": "Sea",
+  "product_count": 1,
+  "message": "MP4 generated",
+  "created_at": "2026-07-11T17:00:51.898686",
+  "result": {
+    "files": [
+      {
+        "country": "Bangladesh",
+        "filepath": "output/bangladesh_sea_products_price_list_20260711_223053_621576.mp4",
+        "filename": "bangladesh_sea_products_price_list_20260711_223053_621576.mp4",
+        "product_count": 1,
+        "shipment_by": "Sea",
+        "currency_code": "BDT",
+        "exchange_rate": 33.57,
+        "format": "mp4"
+      }
+    ],
+    "filepath": "output/bangladesh_sea_products_price_list_20260711_223053_621576.mp4",
+    "filename": "bangladesh_sea_products_price_list_20260711_223053_621576.mp4",
+    "product_count": 1,
+    "shipment_by": "Sea",
+    "country_count": 1
+  },
+  "error": null,
+  "job_id": "b637a3e210c7413f8e4d8b93f4ac951d",
+  "updated_at": "2026-07-11T17:00:53.742131"
+}

@@ -35,6 +35,37 @@ const API = {
         return this.request('/api/products/countries');
     },
 
+    getManagedCountries() {
+        return this.request('/api/countries/');
+    },
+
+    createCountry(country) {
+        return this.request('/api/countries/', {
+            method: 'POST',
+            body: JSON.stringify(country),
+        });
+    },
+
+    updateCountry(id, country) {
+        return this.request(`/api/countries/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify(country),
+        });
+    },
+
+    uploadCountryFlag(id, file) {
+        const formData = new FormData();
+        formData.append('file', file);
+        return this.request(`/api/countries/${id}/flag`, {
+            method: 'POST',
+            body: formData,
+        });
+    },
+
+    deleteCountry(id) {
+        return this.request(`/api/countries/${id}`, { method: 'DELETE' });
+    },
+
     createProduct(product) {
         return this.request('/api/products/', {
             method: 'POST',
@@ -129,6 +160,20 @@ const API = {
             method: 'POST',
             body: JSON.stringify(options),
         });
+    },
+
+    uploadGenerationAudio(file, rightsConfirmed = false) {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('rights_confirmed', rightsConfirmed ? 'true' : 'false');
+        return this.request('/api/generation/audio', {
+            method: 'POST',
+            body: formData,
+        });
+    },
+
+    getGenerationAudio() {
+        return this.request('/api/generation/audio');
     },
 
     getGenerationJob(jobId) {

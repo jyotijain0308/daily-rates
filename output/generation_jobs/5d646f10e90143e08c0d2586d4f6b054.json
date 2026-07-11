@@ -1,0 +1,30 @@
+{
+  "status": "completed",
+  "country": "Pakistan",
+  "shipment_by": "Air",
+  "product_count": 1,
+  "message": "MP4 generated",
+  "created_at": "2026-07-11T16:45:09.514166",
+  "result": {
+    "files": [
+      {
+        "country": "Pakistan",
+        "filepath": "output/pakistan_air_products_price_list_20260711_221510_720851.mp4",
+        "filename": "pakistan_air_products_price_list_20260711_221510_720851.mp4",
+        "product_count": 1,
+        "shipment_by": "Air",
+        "currency_code": "PKR",
+        "exchange_rate": 75.77,
+        "format": "mp4"
+      }
+    ],
+    "filepath": "output/pakistan_air_products_price_list_20260711_221510_720851.mp4",
+    "filename": "pakistan_air_products_price_list_20260711_221510_720851.mp4",
+    "product_count": 1,
+    "shipment_by": "Air",
+    "country_count": 1
+  },
+  "error": null,
+  "job_id": "5d646f10e90143e08c0d2586d4f6b054",
+  "updated_at": "2026-07-11T16:45:10.837737"
+}

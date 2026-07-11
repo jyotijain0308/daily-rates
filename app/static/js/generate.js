@@ -16,14 +16,28 @@ const shipmentSelect = document.getElementById('shipmentSelect');
 const videoPreviewSection = document.getElementById('videoPreviewSection');
 const mp4Preview = document.getElementById('mp4Preview');
 const previewDownloadBtn = document.getElementById('previewDownloadBtn');
+const backgroundAudioInput = document.getElementById('backgroundAudioInput');
+const backgroundAudioSelect = document.getElementById('backgroundAudioSelect');
+const browseBackgroundAudioBtn = document.getElementById('browseBackgroundAudioBtn');
+const clearBackgroundAudioBtn = document.getElementById('clearBackgroundAudioBtn');
+const backgroundAudioFileName = document.getElementById('backgroundAudioFileName');
+const backgroundAudioPreview = document.getElementById('backgroundAudioPreview');
+const backgroundAudioRightsRow = document.getElementById('backgroundAudioRightsRow');
+const backgroundAudioRights = document.getElementById('backgroundAudioRights');
 
 let latestFilename = null;
 let shipmentsByCountry = {};
 let activeJobId = null;
 let jobPollTimer = null;
+let selectedBackgroundAudioFile = null;
+let reusableAudio = [];
 
 generateBtn.addEventListener('click', generatePpt);
 cancelGenerateBtn.addEventListener('click', cancelGeneration);
+browseBackgroundAudioBtn.addEventListener('click', () => backgroundAudioInput.click());
+clearBackgroundAudioBtn.addEventListener('click', clearBackgroundAudio);
+backgroundAudioInput.addEventListener('change', handleBackgroundAudioSelected);
+backgroundAudioSelect.addEventListener('change', handleExistingAudioSelected);
 countrySelect.addEventListener('change', () => {
     populateShipmentOptions(countrySelect.value);
     updateGenerateState();
@@ -66,6 +80,7 @@ async function loadStatus() {
             showMp4Preview(latest_generation.filename);
         }
 
+        await loadReusableAudio();
         await loadHistory();
     } catch (err) {
         showError(err.message);
@@ -91,9 +106,23 @@ async function generatePpt() {
     animateProgress();
 
     try {
+        let audioPath = null;
+        let audioId = backgroundAudioSelect.value || null;
+        if (selectedBackgroundAudioFile) {
+            if (!backgroundAudioRights.checked) {
+                throw new Error('Confirm that you own or have licensed rights to the selected audio.');
+            }
+            statusMessage.textContent = 'Uploading background audio...';
+            const audioResult = await API.uploadGenerationAudio(selectedBackgroundAudioFile, true);
+            audioId = audioResult.data.id;
+            await loadReusableAudio(audioId);
+        }
+
         const result = await API.generatePpt({
             country: selectedCountry,
             shipment_by: selectedShipment,
+            audio_path: audioPath,
+            audio_id: audioId,
         });
         activeJobId = result.data.job_id;
         statusMessage.textContent = result.message;
@@ -104,6 +133,84 @@ async function generatePpt() {
         statusMessage.textContent = err.message;
         showError(err.message);
     }
+}
+
+function handleBackgroundAudioSelected(e) {
+    const file = e.target.files[0];
+    if (!file) {
+        clearBackgroundAudio();
+        return;
+    }
+
+    if (!file.type.startsWith('audio/')) {
+        showError('Please select an audio file');
+        clearBackgroundAudio();
+        return;
+    }
+
+    selectedBackgroundAudioFile = file;
+    backgroundAudioSelect.value = '';
+    backgroundAudioFileName.textContent = file.name;
+    clearBackgroundAudioBtn.style.display = 'inline-flex';
+    backgroundAudioRightsRow.style.display = 'inline-flex';
+    backgroundAudioRights.checked = false;
+    backgroundAudioPreview.removeAttribute('src');
+    backgroundAudioPreview.style.display = 'none';
+}
+
+function clearBackgroundAudio() {
+    selectedBackgroundAudioFile = null;
+    backgroundAudioInput.value = '';
+    backgroundAudioSelect.value = '';
+    backgroundAudioFileName.textContent = 'No audio selected';
+    clearBackgroundAudioBtn.style.display = 'none';
+    backgroundAudioRights.checked = false;
+    backgroundAudioRightsRow.style.display = 'none';
+    backgroundAudioPreview.pause();
+    backgroundAudioPreview.removeAttribute('src');
+    backgroundAudioPreview.style.display = 'none';
+}
+
+async function loadReusableAudio(selectedId = '') {
+    try {
+        const result = await API.getGenerationAudio();
+        reusableAudio = result.data || [];
+        backgroundAudioSelect.innerHTML = '<option value="">No background audio</option>';
+        reusableAudio.forEach(audio => {
+            const option = document.createElement('option');
+            option.value = String(audio.id);
+            option.textContent = audio.original_filename;
+            backgroundAudioSelect.appendChild(option);
+        });
+        if (selectedId) {
+            backgroundAudioSelect.value = String(selectedId);
+            handleExistingAudioSelected();
+        }
+    } catch (err) {
+        console.warn('Could not load background audio', err);
+    }
+}
+
+function handleExistingAudioSelected() {
+    selectedBackgroundAudioFile = null;
+    backgroundAudioInput.value = '';
+    backgroundAudioRights.checked = false;
+    backgroundAudioRightsRow.style.display = 'none';
+
+    const selected = reusableAudio.find(audio => String(audio.id) === backgroundAudioSelect.value);
+    if (!selected) {
+        backgroundAudioFileName.textContent = 'No audio selected';
+        clearBackgroundAudioBtn.style.display = 'none';
+        backgroundAudioPreview.pause();
+        backgroundAudioPreview.removeAttribute('src');
+        backgroundAudioPreview.style.display = 'none';
+        return;
+    }
+
+    backgroundAudioFileName.textContent = selected.original_filename;
+    clearBackgroundAudioBtn.style.display = 'inline-flex';
+    backgroundAudioPreview.src = selected.audio_url;
+    backgroundAudioPreview.style.display = 'block';
 }
 
 async function pollGenerationJob(jobId, selectedShipment) {

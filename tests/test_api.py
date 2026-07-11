@@ -10,7 +10,8 @@ from unittest.mock import patch
 from PIL import Image
 
 from wsgi import create_app, db
-from models import Product, ProductRateHistory
+from country_service import seed_default_countries
+from models import Country, Product, ProductRateHistory
 from image_importer import ProductImageOCRImporter
 from pdf_importer import ProductPDFTableImporter
 
@@ -706,9 +707,99 @@ class TestPPTDailyRatesAPI(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         data = response.get_json()['data']
         self.assertEqual(data['total_products'], 1)
+        self.assertEqual(data['total_countries'], 1)
+        self.assertEqual(data['active_countries'], 1)
         self.assertIn('India', data['countries'])
         self.assertIn('Air', data['shipments'])
         self.assertEqual(data['currency'], 'AED')
+
+    def test_country_management_crud_and_active_dropdown(self):
+        create_response = self.client.post('/api/countries/', json={
+            'name': 'Peru',
+            'currency_code': 'pen',
+            'logo_image': 'assets/countries/peru.jpg',
+            'is_active': True,
+        })
+        self.assertEqual(create_response.status_code, 201)
+        country = create_response.get_json()['data']
+        self.assertEqual(country['name'], 'Peru')
+        self.assertEqual(country['currency_code'], 'PEN')
+        self.assertIsNone(country['logo_url'])
+
+        dropdown_response = self.client.get('/api/products/countries')
+        self.assertEqual(dropdown_response.status_code, 200)
+        self.assertIn('Peru', dropdown_response.get_json()['data'])
+
+        update_response = self.client.put(f"/api/countries/{country['id']}", json={
+            'is_active': False,
+        })
+        self.assertEqual(update_response.status_code, 200)
+
+        dropdown_response = self.client.get('/api/products/countries')
+        self.assertEqual(dropdown_response.status_code, 200)
+        self.assertNotIn('Peru', dropdown_response.get_json()['data'])
+
+    def test_product_create_auto_adds_country(self):
+        response = self.client.post('/api/products/', json={
+            'serial_no': 1,
+            'country_of_origin': 'Bangladesh',
+            'shipment_by': 'Air',
+            'product_name': 'Fresh Grapes',
+            'weight_kg': 8,
+            'packing': 'Box',
+            'price_aed': 42.00,
+        })
+        self.assertEqual(response.status_code, 201)
+
+        with self.app.app_context():
+            country = Country.query.filter_by(name='Bangladesh').first()
+            self.assertIsNotNone(country)
+            self.assertEqual(country.currency_code, 'BDT')
+
+    def test_seed_backfills_known_country_currency_codes(self):
+        with self.app.app_context():
+            country = Country(name='Bangladesh', currency_code=None, is_active=True)
+            db.session.add(country)
+            db.session.commit()
+
+            seed_default_countries()
+
+            self.assertEqual(Country.query.filter_by(name='Bangladesh').first().currency_code, 'BDT')
+
+    def test_country_flag_upload_updates_logo_image(self):
+        create_response = self.client.post('/api/countries/', json={
+            'name': 'Flag Test Country',
+            'currency_code': 'USD',
+            'is_active': True,
+        })
+        self.assertEqual(create_response.status_code, 201)
+        country_id = create_response.get_json()['data']['id']
+
+        image_bytes = io.BytesIO()
+        Image.new("RGB", (1200, 700), "yellow").save(image_bytes, format="PNG")
+        image_bytes.seek(0)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            previous_dir = self.app.config['COUNTRY_ASSETS_DIR']
+            self.app.config['COUNTRY_ASSETS_DIR'] = tmpdir
+            try:
+                response = self.client.post(
+                    f'/api/countries/{country_id}/flag',
+                    data={'file': (image_bytes, 'flag.png')},
+                    content_type='multipart/form-data',
+                )
+            finally:
+                self.app.config['COUNTRY_ASSETS_DIR'] = previous_dir
+
+            self.assertEqual(response.status_code, 200)
+            data = response.get_json()['data']
+            self.assertEqual(data['logo_image'], 'assets/countries/flag_test_country.jpg')
+            self.assertTrue(data['logo_url'].startswith('/api/countries/image/flag_test_country.jpg'))
+            saved_path = Path(tmpdir) / 'flag_test_country.jpg'
+            self.assertTrue(saved_path.exists())
+            with Image.open(saved_path) as saved_image:
+                self.assertEqual(saved_image.size, (300, 200))
+                self.assertEqual(saved_image.format, 'JPEG')
 
     def test_generation_creates_selected_country_mp4_even_when_ppt_requested(self):
         self.client.post('/api/products/', json={
@@ -774,6 +865,40 @@ class TestPPTDailyRatesAPI(unittest.TestCase):
         self.assertIn('job_id', data)
         mock_start_job.assert_called_once()
 
+    def test_generation_uses_currency_code_from_countries_table(self):
+        with self.app.app_context():
+            country = Country.query.filter_by(name='Bangladesh').first()
+            if not country:
+                country = Country(name='Bangladesh', is_active=False)
+                db.session.add(country)
+            country.currency_code = 'BDT'
+            db.session.add(Product(
+                serial_no=1,
+                country_of_origin='Bangladesh',
+                shipment_by='Sea',
+                product_name='Potato',
+                weight_kg=10,
+                packing='Bag',
+                price_aed=25.00,
+            ))
+            db.session.commit()
+
+            with patch('ppt_service.PPTGenerationService._get_aed_exchange_rates', return_value={'BDT': 32.5}) as mock_rates:
+                with patch('ppt_service.MP4Generator') as mock_generator_class:
+                    mock_generator = mock_generator_class.return_value
+                    mock_generator.save.return_value = None
+
+                    from ppt_service import PPTGenerationService
+                    success, result, error = PPTGenerationService.generate_ppt(
+                        country_filter='Bangladesh',
+                        shipment_filter='Sea',
+                    )
+
+        self.assertTrue(success, error)
+        mock_rates.assert_called_once_with(['BDT'])
+        self.assertEqual(result['files'][0]['currency_code'], 'BDT')
+        self.assertEqual(result['files'][0]['exchange_rate'], 32.5)
+
     def test_mp4_preview_serves_video_inline(self):
         os.makedirs('output', exist_ok=True)
         filename = 'unit_test_preview.mp4'
@@ -801,6 +926,103 @@ class TestPPTDailyRatesAPI(unittest.TestCase):
         response = self.client.post('/api/generation/generate', json={'country': 'India'})
         self.assertEqual(response.status_code, 400)
         self.assertIn('shipment', response.get_json()['message'].lower())
+
+    def test_generation_audio_upload_accepts_audio_file(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            previous_dir = self.app.config['GENERATION_AUDIO_DIR']
+            self.app.config['GENERATION_AUDIO_DIR'] = tmpdir
+            try:
+                response = self.client.post(
+                    '/api/generation/audio',
+                    data={
+                        'file': (io.BytesIO(b'fake audio bytes'), 'background.mp3'),
+                        'rights_confirmed': 'true',
+                    },
+                    content_type='multipart/form-data',
+                )
+            finally:
+                self.app.config['GENERATION_AUDIO_DIR'] = previous_dir
+
+            self.assertEqual(response.status_code, 200)
+            data = response.get_json()['data']
+            self.assertTrue(data['file_path'].endswith('.mp3'))
+            self.assertTrue(Path(data['file_path']).exists())
+            self.assertIn('/api/generation/audio/', data['audio_url'])
+
+    def test_generation_audio_upload_requires_rights_confirmation(self):
+        response = self.client.post(
+            '/api/generation/audio',
+            data={'file': (io.BytesIO(b'fake audio bytes'), 'background.mp3')},
+            content_type='multipart/form-data',
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('rights', response.get_json()['message'].lower())
+
+    def test_generation_audio_list_and_preview(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            previous_dir = self.app.config['GENERATION_AUDIO_DIR']
+            self.app.config['GENERATION_AUDIO_DIR'] = tmpdir
+            try:
+                upload_response = self.client.post(
+                    '/api/generation/audio',
+                    data={
+                        'file': (io.BytesIO(b'fake audio bytes'), 'background.mp3'),
+                        'rights_confirmed': 'true',
+                    },
+                    content_type='multipart/form-data',
+                )
+                audio = upload_response.get_json()['data']
+
+                list_response = self.client.get('/api/generation/audio')
+                preview_response = self.client.get(audio['audio_url'])
+            finally:
+                self.app.config['GENERATION_AUDIO_DIR'] = previous_dir
+
+            self.assertEqual(list_response.status_code, 200)
+            self.assertEqual(list_response.get_json()['data'][0]['id'], audio['id'])
+            self.assertEqual(preview_response.status_code, 200)
+
+    def test_generation_accepts_existing_audio_id(self):
+        self.client.post('/api/products/', json={
+            'serial_no': 1,
+            'country_of_origin': 'India',
+            'shipment_by': 'Air',
+            'product_name': 'Wheat Flour',
+            'weight_kg': 25,
+            'packing': 'Bag',
+            'price_aed': 72.50,
+        })
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            previous_dir = self.app.config['GENERATION_AUDIO_DIR']
+            self.app.config['GENERATION_AUDIO_DIR'] = tmpdir
+            audio_path = Path(tmpdir) / 'existing.mp3'
+            audio_path.write_bytes(b'fake audio bytes')
+            try:
+                with self.app.app_context():
+                    from models import BackgroundAudio
+                    audio = BackgroundAudio(
+                        original_filename='existing.mp3',
+                        stored_filename='existing.mp3',
+                        file_path=str(audio_path),
+                        rights_confirmed=True,
+                    )
+                    db.session.add(audio)
+                    db.session.commit()
+                    audio_id = audio.id
+
+                with patch('app.routes.generation_routes.start_generation_job') as mock_start_job:
+                    response = self.client.post('/api/generation/generate', json={
+                        'country': 'India',
+                        'shipment_by': 'Air',
+                        'audio_id': audio_id,
+                    })
+            finally:
+                self.app.config['GENERATION_AUDIO_DIR'] = previous_dir
+
+        self.assertEqual(response.status_code, 202)
+        self.assertEqual(mock_start_job.call_args.kwargs['audio_path'], str(audio_path))
 
     def test_generation_status(self):
         response = self.client.get('/api/generation/status')

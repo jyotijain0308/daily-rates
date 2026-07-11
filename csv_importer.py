@@ -5,6 +5,7 @@ import csv
 import logging
 from io import StringIO, TextIOWrapper
 from typing import List, Dict, Tuple
+from country_service import ensure_country
 from models import Product, ProductRateHistory
 from wsgi import db
 
@@ -294,6 +295,7 @@ class ProductCSVImporter:
                 try:
                     product_name = plan_row['product_name'].strip()
                     country_of_origin = plan_row['country_of_origin'].strip()
+                    ensure_country(country_of_origin)
                     new_price = float(plan_row['price_aed'])
                     product = Product.query.filter_by(
                         product_name=product_name,

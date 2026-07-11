@@ -20,7 +20,7 @@ from src.exchange_rates import ExchangeRateService
 from src.product_data import ProductData
 from src.product_image_service import ProductImageService
 from src import config
-from src.config import COUNTRY_CURRENCY_CODES
+from country_service import country_currency_map, country_logo_map
 from models import Product, GenerationHistory
 from wsgi import db
 
@@ -36,7 +36,8 @@ class PPTGenerationService:
     
     @staticmethod
     def generate_ppt(products_list=None, custom_filename=None, country_filter=None,
-                     shipment_filter=None, output_format='mp4', is_cancelled=None):
+                     shipment_filter=None, output_format='mp4', background_audio_path=None,
+                     is_cancelled=None):
         """
         Generate MP4 from products.
         
@@ -87,10 +88,13 @@ class PPTGenerationService:
             for product_data in products_data:
                 products_by_country.setdefault(product_data['country_of_origin'], []).append(product_data)
 
+            currency_codes = country_currency_map()
+            country_logos = country_logo_map()
+
             target_currencies = sorted({
-                COUNTRY_CURRENCY_CODES[country]
+                currency_codes[country]
                 for country in products_by_country
-                if country in COUNTRY_CURRENCY_CODES
+                if country in currency_codes
             })
             exchange_rates = PPTGenerationService._get_aed_exchange_rates(target_currencies)
 
@@ -107,7 +111,7 @@ class PPTGenerationService:
                 )
                 PPTGenerationService._prefetch_missing_product_images(country_products, is_cancelled=is_cancelled)
                 PPTGenerationService._raise_if_cancelled(is_cancelled)
-                generator = MP4Generator()
+                generator = MP4Generator(country_logo_images=country_logos)
                 # PPT generation is disabled for now.
                 # generator = PPTGenerator()
                 shipment_label = shipment_filter or country_products[0].get('shipment_by')
@@ -130,7 +134,7 @@ class PPTGenerationService:
                     )
                     generator.add_product_slide(product_obj, slide_number=idx)
 
-                currency_code = COUNTRY_CURRENCY_CODES.get(country)
+                currency_code = currency_codes.get(country)
                 generator.add_thank_you_slide(
                     country_name=country,
                     exchange_rate=exchange_rates.get(currency_code) if currency_code else None,
@@ -149,7 +153,11 @@ class PPTGenerationService:
 
                 os.makedirs(os.path.dirname(output_path) or '.', exist_ok=True)
                 logger.info("Writing MP4 file: %s", output_path)
-                generator.save(output_path, is_cancelled=is_cancelled)
+                generator.save(
+                    output_path,
+                    is_cancelled=is_cancelled,
+                    audio_path=background_audio_path,
+                )
                 logger.info("Finished MP4 file: %s", output_path)
                 PPTGenerationService._record_generation(output_path, len(country_products), 'success')
 
@@ -162,6 +170,7 @@ class PPTGenerationService:
                     'currency_code': currency_code,
                     'exchange_rate': exchange_rates.get(currency_code) if currency_code else None,
                     'format': output_format,
+                    'has_audio': bool(background_audio_path),
                 })
 
             first_file = generated_files[0]
@@ -172,6 +181,7 @@ class PPTGenerationService:
                 'product_count': len(products_data),
                 'shipment_by': first_file.get('shipment_by'),
                 'country_count': len(generated_files),
+                'has_audio': first_file.get('has_audio', False),
             }
 
             logger.info(f"✓ Generated {len(generated_files)} country {output_format.upper()} files")

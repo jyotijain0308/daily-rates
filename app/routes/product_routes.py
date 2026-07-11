@@ -6,10 +6,11 @@ from pathlib import Path
 
 from flask import Blueprint, request, jsonify, send_from_directory, url_for, Response
 from PIL import UnidentifiedImageError
+from country_service import active_country_names, ensure_country
 from csv_importer import products_to_csv
-from src.config import COMPANY_DEFAULT_COUNTRY, COUNTRIES, CURRENCY
+from src.config import COMPANY_DEFAULT_COUNTRY, CURRENCY
 from src.product_image_service import ProductImageService
-from models import Product, ProductRateHistory
+from models import Country, Product, ProductRateHistory
 from wsgi import db
 
 logger = logging.getLogger(__name__)
@@ -256,6 +257,8 @@ def get_stats():
     """Get product statistics"""
     try:
         total_products = Product.query.count()
+        total_countries = Country.query.count()
+        active_countries = Country.query.filter_by(is_active=True).count()
         countries = db.session.query(
             Product.country_of_origin, db.func.count(Product.id)
         ).group_by(Product.country_of_origin).all()
@@ -267,6 +270,8 @@ def get_stats():
             'status': 'success',
             'data': {
                 'total_products': total_products,
+                'total_countries': total_countries,
+                'active_countries': active_countries,
                 'countries': {country: count for country, count in countries},
                 'shipments': {shipment: count for shipment, count in shipments},
                 'company_default_country': COMPANY_DEFAULT_COUNTRY,
@@ -283,10 +288,10 @@ def get_stats():
 
 @product_bp.route('/countries', methods=['GET'])
 def get_countries():
-    """Get configured countries for product rates"""
+    """Get active managed countries for product rates"""
     return jsonify({
         'status': 'success',
-        'data': COUNTRIES,
+        'data': active_country_names(),
         'default_country': COMPANY_DEFAULT_COUNTRY
     }), 200
 
@@ -340,10 +345,13 @@ def create_product():
                 'message': "serial_no must be a whole number, weight_kg and price_aed must be valid numbers"
             }), 400
         
+        country_of_origin = data['country_of_origin'].strip()
+        ensure_country(country_of_origin)
+
         # Create product
         product = Product(
             serial_no=serial_no,
-            country_of_origin=data['country_of_origin'].strip(),
+            country_of_origin=country_of_origin,
             shipment_by=data['shipment_by'].strip(),
             product_name=data['product_name'].strip(),
             weight_kg=weight_kg,
@@ -415,6 +423,9 @@ def update_product(product_id):
                         }), 400
                 else:
                     setattr(product, field, data[field].strip() if isinstance(data[field], str) else data[field])
+
+        if 'country_of_origin' in data:
+            ensure_country(product.country_of_origin)
         
         if 'price_aed' in data and float(product.price_aed) != old_price_aed:
             db.session.add(ProductRateHistory(

@@ -14,7 +14,7 @@ async function loadDashboard() {
             API.getGenerationHistory(),
         ]);
 
-        const countryCount = Object.keys(stats.data.countries || {}).length;
+        const countryCount = stats.data.total_countries ?? Object.keys(stats.data.countries || {}).length;
         const latest = status.data.latest_generation;
 
         statsGrid.innerHTML = `

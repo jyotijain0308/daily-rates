@@ -26,6 +26,11 @@ def products_page():
     return render_template('products.html', active_page='products')
 
 
+@page_bp.route('/countries')
+def countries_page():
+    return render_template('countries.html', active_page='countries')
+
+
 @page_bp.route('/generate')
 def generate_page():
     return render_template('generate.html', active_page='generate')

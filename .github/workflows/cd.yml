@@ -307,6 +307,15 @@ jobs:
               assert payload["status"] == "healthy", payload
           PY
               then
+                DOCKER_BIN="$(command -v docker)"
+                CRON_MARKER="# ppt-daily-rates cleanup-generations"
+                CRON_COMMAND="0 2 * * * $DOCKER_BIN exec $CONTAINER_NAME flask --app 'wsgi:create_app' cleanup-generations --days 7 >> $APP_DIR/cleanup-generations.log 2>&1 $CRON_MARKER"
+                if command -v crontab >/dev/null 2>&1; then
+                  (crontab -l 2>/dev/null | grep -v "$CRON_MARKER" || true; echo "$CRON_COMMAND") | crontab -
+                  echo "Installed generation cleanup cron."
+                else
+                  echo "crontab command not found; skipping automatic cleanup cron setup."
+                fi
                 exit 0
               fi
             else

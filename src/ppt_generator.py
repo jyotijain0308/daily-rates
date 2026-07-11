@@ -24,11 +24,12 @@ logger = logging.getLogger(__name__)
 class PPTGenerator:
     """Generate PowerPoint presentations with product price lists."""
 
-    def __init__(self):
+    def __init__(self, country_logo_images=None):
         self.prs = Presentation()
         self.prs.slide_width = SLIDE_WIDTH
         self.prs.slide_height = SLIDE_HEIGHT
         self.product_images = ProductImageService()
+        self.country_logo_images = country_logo_images or COUNTRY_LOGO_IMAGES
 
     def _resolve_asset(self, image_path: Optional[str]) -> Optional[Path]:
         if not image_path:
@@ -115,7 +116,7 @@ class PPTGenerator:
             fit_to_box=True
         )
         self._add_image_or_text(
-            slide, COUNTRY_LOGO_IMAGES.get(country_name), country_name,
+            slide, self.country_logo_images.get(country_name), country_name,
             Inches(0.5), Inches(1.95), Inches(9.0), Inches(2.2),
             fit_to_box=True
         )
@@ -162,7 +163,7 @@ class PPTGenerator:
             Inches(0.35), Inches(0.25), Inches(1.25), Inches(0.6)
         )
         self._add_image_or_text(
-            slide, COUNTRY_LOGO_IMAGES.get(product.country_of_origin), product.country_of_origin,
+            slide, self.country_logo_images.get(product.country_of_origin), product.country_of_origin,
             Inches(8.55), Inches(0.25), Inches(1.0), Inches(0.65),
             fit_to_box=True
         )
@@ -221,7 +222,7 @@ class PPTGenerator:
         )
 
         self._add_image_or_text(
-            slide, COUNTRY_LOGO_IMAGES.get(country_name), country_name,
+            slide, self.country_logo_images.get(country_name), country_name,
             Inches(0.55), Inches(2.0), Inches(1.9), Inches(1.25),
             fit_to_box=True
         )

@@ -1,0 +1,12 @@
+{
+  "status": "queued",
+  "country": "India",
+  "shipment_by": "Air",
+  "product_count": 1,
+  "message": "Queued",
+  "created_at": "2026-07-11T15:30:07.866622",
+  "result": null,
+  "error": null,
+  "job_id": "126adb2746b24013a7c8e02c3846c912",
+  "updated_at": "2026-07-11T15:30:07.866638"
+}

@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+
+{% block title %}Countries — PPT Daily Rates{% endblock %}
+
+{% block content %}
+<section class="page-header">
+    <div>
+        <h1>Countries</h1>
+        <p class="subtitle">Manage country names, currencies, and flag image paths</p>
+    </div>
+    <div class="page-header-actions">
+        <button type="button" class="btn btn-primary" id="addCountryBtn">+ Add Country</button>
+    </div>
+</section>
+
+<section class="card">
+    <div class="table-wrap">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Country</th>
+                    <th>Currency</th>
+                    <th>Flag</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="countriesBody">
+                <tr><td colspan="5" class="empty-state">Loading countries...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<div class="modal-overlay" id="countryModal" style="display:none;">
+    <div class="modal">
+        <div class="modal-header">
+            <h2 id="countryModalTitle">Add Country</h2>
+            <button type="button" class="modal-close" id="closeCountryModalBtn">&times;</button>
+        </div>
+        <form id="countryForm">
+            <input type="hidden" id="countryId">
+            <input type="file" id="countryFlagInput" accept="image/*" hidden>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="countryName">Country name *</label>
+                    <input type="text" id="countryName" class="input" required>
+                </div>
+                <div class="form-group">
+                    <label for="countryCurrencyCode">Currency code</label>
+                    <input type="text" id="countryCurrencyCode" class="input" maxlength="10" placeholder="USD">
+                </div>
+                <div class="form-group form-group-wide">
+                    <label>Country flag</label>
+                    <div class="country-flag-preview">
+                        <img id="countryFlagPreviewImg" class="country-logo-img" src="" alt="Country flag preview" style="display:none;">
+                        <span id="countryFlagPreviewEmpty" class="country-logo-empty">No flag</span>
+                    </div>
+                    <div class="file-picker-row">
+                        <button type="button" class="btn btn-secondary" id="browseCountryFlagBtn">Browse Flag</button>
+                        <span class="text-muted" id="countryFlagFileName">No file selected</span>
+                    </div>
+                </div>
+                <label class="checkbox-row">
+                    <input type="checkbox" id="countryIsActive" checked>
+                    <span>Active in product dropdowns</span>
+                </label>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn btn-secondary" id="cancelCountryModalBtn">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save Country</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/countries.js') }}"></script>
+{% endblock %}

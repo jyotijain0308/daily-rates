@@ -79,6 +79,34 @@ class ProductRateHistory(db.Model):
         return f'<ProductRateHistory product={self.product_id} {self.old_price_aed}->{self.new_price_aed}>'
 
 
+class Country(db.Model):
+    """Manage countries and their presentation metadata."""
+    __tablename__ = 'countries'
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False, unique=True, index=True)
+    currency_code = db.Column(db.String(10), nullable=True)
+    logo_image = db.Column(db.String(500), nullable=True)
+    is_active = db.Column(db.Boolean, nullable=False, default=True, index=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    def to_dict(self):
+        """Convert country to dictionary."""
+        return {
+            'id': self.id,
+            'name': self.name,
+            'currency_code': self.currency_code,
+            'logo_image': self.logo_image,
+            'is_active': self.is_active,
+            'created_at': self.created_at.isoformat(),
+            'updated_at': self.updated_at.isoformat(),
+        }
+
+    def __repr__(self):
+        return f'<Country {self.name}>'
+
+
 class GenerationHistory(db.Model):
     """Track PPT generation history"""
     __tablename__ = 'generation_history'
@@ -104,3 +132,29 @@ class GenerationHistory(db.Model):
     
     def __repr__(self):
         return f'<GenerationHistory {self.filename}>'
+
+
+class BackgroundAudio(db.Model):
+    """Reusable background audio uploaded for MP4 generation."""
+    __tablename__ = 'background_audio'
+
+    id = db.Column(db.Integer, primary_key=True)
+    original_filename = db.Column(db.String(255), nullable=False)
+    stored_filename = db.Column(db.String(255), nullable=False, unique=True)
+    file_path = db.Column(db.String(500), nullable=False)
+    rights_confirmed = db.Column(db.Boolean, nullable=False, default=True)
+    uploaded_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    def to_dict(self):
+        """Convert background audio to dictionary."""
+        return {
+            'id': self.id,
+            'original_filename': self.original_filename,
+            'stored_filename': self.stored_filename,
+            'file_path': self.file_path,
+            'rights_confirmed': self.rights_confirmed,
+            'uploaded_at': self.uploaded_at.isoformat(),
+        }
+
+    def __repr__(self):
+        return f'<BackgroundAudio {self.original_filename}>'

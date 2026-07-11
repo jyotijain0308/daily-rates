@@ -4,6 +4,7 @@ Flask application factory and initialization
 import os
 import logging
 import sys
+import click
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
@@ -101,6 +102,8 @@ def create_app(config=None):
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file upload
     app.config['UPLOAD_FOLDER'] = 'uploads'
+    app.config['COUNTRY_ASSETS_DIR'] = 'src/assets/countries'
+    app.config['GENERATION_AUDIO_DIR'] = 'uploads/audio'
     
     # Override with custom config if provided
     if config:
@@ -119,6 +122,7 @@ def create_app(config=None):
     
     # Create necessary directories
     os.makedirs(app.config.get('UPLOAD_FOLDER', 'uploads'), exist_ok=True)
+    os.makedirs(app.config.get('GENERATION_AUDIO_DIR', 'uploads/audio'), exist_ok=True)
     os.makedirs('output', exist_ok=True)
     os.makedirs('src/output', exist_ok=True)
 
@@ -128,24 +132,42 @@ def create_app(config=None):
     # Register blueprints
     with app.app_context():
         # Import models
-        from models import Product, ProductRateHistory, GenerationHistory
+        from models import BackgroundAudio, Country, Product, ProductRateHistory, GenerationHistory
 
         # Local/test startup keeps backward compatibility. Migration commands
         # skip this so Alembic can create/upgrade tables itself.
         if not is_flask_migration_command():
             db.create_all()
             ensure_database_schema()
+            from country_service import seed_default_countries
+            seed_default_countries()
         logger.info("Database initialized")
         
         # Register route blueprints
         from app.routes.import_routes import import_bp
         from app.routes.product_routes import product_bp
+        from app.routes.country_routes import country_bp
         from app.routes.generation_routes import generation_bp
         from app.routes.page_routes import page_bp
         app.register_blueprint(import_bp)
         app.register_blueprint(product_bp)
+        app.register_blueprint(country_bp)
         app.register_blueprint(generation_bp)
         app.register_blueprint(page_bp)
+
+    @app.cli.command('cleanup-generations')
+    @click.option('--days', default=7, show_default=True, type=int, help='Delete generation artifacts older than this many days.')
+    def cleanup_generations_command(days):
+        """Delete old generated files, job files, and generation history rows."""
+        from output_cleanup import cleanup_old_generation_artifacts
+
+        summary = cleanup_old_generation_artifacts(days=days)
+        click.echo(
+            "Deleted "
+            f"{summary['deleted_files']} output file(s), "
+            f"{summary['deleted_history_rows']} generation history row(s), "
+            f"{summary['deleted_job_files']} job file(s)."
+        )
     
     @app.route('/health')
     def health():

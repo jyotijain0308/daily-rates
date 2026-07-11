@@ -93,39 +93,10 @@ OLLAMA_PDF_EXTRACTION_MODEL = os.getenv("OLLAMA_PDF_EXTRACTION_MODEL", "llama3.2
 CURRENCY = "AED"
 RATE_DISPLAY_FORMAT = "AED {:.2f}"
 
-# Supported countries for country-specific product rates
-COUNTRIES = [
-    "India",
-    "United States",
-    "Brazil",
-    "Thailand",
-    "Vietnam",
-    "Australia",
-    "Canada",
-    "China",
-]
-
-COUNTRY_CURRENCY_CODES = {
-    "India": "INR",
-    "United States": "USD",
-    "Brazil": "BRL",
-    "Thailand": "THB",
-    "Vietnam": "VND",
-    "Australia": "AUD",
-    "Canada": "CAD",
-    "China": "CNY",
-}
-
-COUNTRY_LOGO_IMAGES = {
-    "India": "assets/countries/india.jpg",
-    "United States": "assets/countries/united_states.jpg",
-    "Brazil": "assets/countries/brazil.jpg",
-    "Thailand": "assets/countries/thailand.jpg",
-    "Vietnam": "assets/countries/vietnam.jpg",
-    "Australia": "assets/countries/australia.jpg",
-    "Canada": "assets/countries/canada.jpg",
-    "China": "assets/countries/china.jpg",
-}
+# Countries are managed dynamically in the database.
+COUNTRIES = []
+COUNTRY_CURRENCY_CODES = {}
+COUNTRY_LOGO_IMAGES = {}
 
 # Slide Layout Settings
 PRODUCTS_PER_SLIDE = 1  # Number of products per slide
