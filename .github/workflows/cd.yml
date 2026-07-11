@@ -167,6 +167,7 @@ jobs:
           APP_NETWORK="${CONTAINER_NAME}-network"
           POSTGRES_CONTAINER_NAME="${CONTAINER_NAME}-postgres"
           POSTGRES_VOLUME_NAME="${CONTAINER_NAME}-postgres-data"
+          export POSTGRES_CONTAINER_NAME
 
           if [ -z "${DATABASE_URL:-}" ]; then
             if [ -z "${POSTGRES_DB:-}" ] || [ -z "${POSTGRES_USER:-}" ] || [ -z "${POSTGRES_PASSWORD:-}" ]; then
