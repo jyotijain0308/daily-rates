@@ -730,27 +730,22 @@ class TestPPTDailyRatesAPI(unittest.TestCase):
             'price_aed': 158.00,
         })
 
-        response = self.client.post('/api/generation/generate', json={
-            'country': 'India',
-            'shipment_by': 'Air',
-            'format': 'ppt',
-        })
-        self.assertEqual(response.status_code, 200)
-        data = response.get_json()
-        self.assertEqual(data['status'], 'success')
-        self.assertTrue(os.path.exists(data['data']['filepath']))
-        self.assertEqual(data['data']['country_count'], 1)
-        self.assertEqual(len(data['data']['files']), 1)
-        self.assertEqual(data['data']['files'][0]['country'], 'India')
-        self.assertEqual(data['data']['files'][0]['shipment_by'], 'Air')
-        self.assertEqual(data['data']['shipment_by'], 'Air')
-        self.assertTrue(data['data']['filename'].endswith('.mp4'))
-        self.assertIn('india_air_products_price_list', data['data']['filename'])
+        with patch('app.routes.generation_routes.start_generation_job') as mock_start_job:
+            response = self.client.post('/api/generation/generate', json={
+                'country': 'India',
+                'shipment_by': 'Air',
+                'format': 'ppt',
+            })
 
-        download_response = self.client.get(
-            f"/api/generation/download/{data['data']['filename']}"
-        )
-        self.assertEqual(download_response.status_code, 200)
+        self.assertEqual(response.status_code, 202)
+        data = response.get_json()
+        self.assertEqual(data['status'], 'accepted')
+        self.assertEqual(data['data']['country'], 'India')
+        self.assertEqual(data['data']['shipment_by'], 'Air')
+        self.assertEqual(data['data']['product_count'], 1)
+        self.assertEqual(data['data']['status'], 'queued')
+        self.assertIn('job_id', data['data'])
+        mock_start_job.assert_called_once()
 
     def test_generation_creates_selected_country_mp4(self):
         self.client.post('/api/products/', json={
@@ -763,15 +758,21 @@ class TestPPTDailyRatesAPI(unittest.TestCase):
             'price_aed': 72.50,
         })
 
-        response = self.client.post('/api/generation/generate', json={
-            'country': 'India',
-            'shipment_by': 'Air',
-            'format': 'mp4',
-        })
-        self.assertEqual(response.status_code, 200)
+        with patch('app.routes.generation_routes.start_generation_job') as mock_start_job:
+            response = self.client.post('/api/generation/generate', json={
+                'country': 'India',
+                'shipment_by': 'Air',
+                'format': 'mp4',
+            })
+
+        self.assertEqual(response.status_code, 202)
         data = response.get_json()['data']
-        self.assertTrue(data['filename'].endswith('.mp4'))
-        self.assertTrue(os.path.exists(data['filepath']))
+        self.assertEqual(data['country'], 'India')
+        self.assertEqual(data['shipment_by'], 'Air')
+        self.assertEqual(data['product_count'], 1)
+        self.assertEqual(data['status'], 'queued')
+        self.assertIn('job_id', data)
+        mock_start_job.assert_called_once()
 
     def test_mp4_preview_serves_video_inline(self):
         os.makedirs('output', exist_ok=True)
