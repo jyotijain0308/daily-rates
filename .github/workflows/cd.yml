@@ -257,6 +257,14 @@ jobs:
             TEMP_CONTAINER="$(docker create "$IMAGE")"
             docker cp "$TEMP_CONTAINER:/app/src/assets/." "$APP_DIR/assets/"
             docker rm "$TEMP_CONTAINER"
+          else
+            TEMP_CONTAINER="$(docker create "$IMAGE")"
+            for ASSET_FILE in company_logo.png logo.jpg uae_logo.jpg; do
+              if [ ! -f "$APP_DIR/assets/$ASSET_FILE" ]; then
+                docker cp "$TEMP_CONTAINER:/app/src/assets/$ASSET_FILE" "$APP_DIR/assets/$ASSET_FILE" 2>/dev/null || true
+              fi
+            done
+            docker rm "$TEMP_CONTAINER"
           fi
 
           docker stop "$CONTAINER_NAME" 2>/dev/null || true
