@@ -22,16 +22,58 @@ jobs:
 
       - name: Deploy on EC2
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          PDF_TABLE_EXTRACTION_PROVIDER: ${{ secrets.PDF_TABLE_EXTRACTION_PROVIDER }}
+          OPENAI_PDF_EXTRACTION_MODEL: ${{ secrets.OPENAI_PDF_EXTRACTION_MODEL }}
+          OLLAMA_BASE_URL: ${{ secrets.OLLAMA_BASE_URL }}
+          OLLAMA_PDF_EXTRACTION_MODEL: ${{ secrets.OLLAMA_PDF_EXTRACTION_MODEL }}
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           port: 22
+          envs: POSTGRES_DB,POSTGRES_USER,POSTGRES_PASSWORD,DATABASE_URL,OPENAI_API_KEY,PDF_TABLE_EXTRACTION_PROVIDER,OPENAI_PDF_EXTRACTION_MODEL,OLLAMA_BASE_URL,OLLAMA_PDF_EXTRACTION_MODEL
           script_stop: true
           command_timeout: 20m
           script: |
+            set -euo pipefail
             cd ~/flask-app
             git pull origin main
+
+            if [ -z "${DATABASE_URL:-}" ]; then
+              if [ -z "${POSTGRES_DB:-}" ] || [ -z "${POSTGRES_USER:-}" ] || [ -z "${POSTGRES_PASSWORD:-}" ]; then
+                echo "Missing database secrets. Set DATABASE_URL, or set POSTGRES_DB, POSTGRES_USER, and POSTGRES_PASSWORD."
+                exit 1
+              fi
+              DATABASE_URL="$(python3 - <<'PY'
+            import os
+            from urllib.parse import quote
+
+            user = quote(os.environ["POSTGRES_USER"], safe="")
+            password = quote(os.environ["POSTGRES_PASSWORD"], safe="")
+            database = quote(os.environ["POSTGRES_DB"], safe="")
+            print(f"postgresql+psycopg://{user}:{password}@postgres:5432/{database}")
+            PY
+            )"
+            fi
+
+            cat > .env <<EOF
+            POSTGRES_DB=${POSTGRES_DB}
+            POSTGRES_USER=${POSTGRES_USER}
+            POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+            DATABASE_URL=${DATABASE_URL}
+            OPENAI_API_KEY=${OPENAI_API_KEY}
+            PDF_TABLE_EXTRACTION_PROVIDER=${PDF_TABLE_EXTRACTION_PROVIDER:-ollama}
+            OPENAI_PDF_EXTRACTION_MODEL=${OPENAI_PDF_EXTRACTION_MODEL:-gpt-4o-mini}
+            OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+            OLLAMA_PDF_EXTRACTION_MODEL=${OLLAMA_PDF_EXTRACTION_MODEL:-llama3.2-vision}
+            EOF
+
             docker compose down
             docker compose up -d --build
             docker system prune -f

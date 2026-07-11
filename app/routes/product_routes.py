@@ -2,13 +2,93 @@
 Product management API routes
 """
 import logging
-from flask import Blueprint, request, jsonify
+from pathlib import Path
+
+from flask import Blueprint, request, jsonify, send_from_directory, url_for, Response
+from PIL import UnidentifiedImageError
+from csv_importer import products_to_csv
 from src.config import COMPANY_DEFAULT_COUNTRY, COUNTRIES, CURRENCY
-from models import Product
+from src.product_image_service import ProductImageService
+from models import Product, ProductRateHistory
 from wsgi import db
 
 logger = logging.getLogger(__name__)
 product_bp = Blueprint('products', __name__, url_prefix='/api/products')
+product_image_service = ProductImageService()
+
+
+def product_to_dict(product):
+    """Serialize a product with the listing image URL."""
+    data = product.to_dict()
+    image_path = product_image_service.get_product_image_path(
+        product.product_name,
+        product.country_of_origin,
+        fetch_if_missing=False,
+    )
+    if image_path:
+        image_file = product_image_service.assets_root / image_path
+        version = int(image_file.stat().st_mtime) if image_file.exists() else None
+        data['image_url'] = url_for(
+            'products.get_product_image',
+            filename=Path(image_path).name,
+            v=version,
+        )
+    else:
+        data['image_url'] = None
+    return data
+
+
+@product_bp.route('/image/<path:filename>', methods=['GET'])
+def get_product_image(filename):
+    """Serve cached product images used by PPT/MP4 generation."""
+    image_dir = product_image_service.assets_root / 'assets' / 'products'
+    return send_from_directory(image_dir, Path(filename).name)
+
+
+@product_bp.route('/<int:product_id>/image', methods=['POST'])
+def update_product_image(product_id):
+    """Upload a manual image override for a product."""
+    try:
+        product = Product.query.get_or_404(product_id)
+
+        if 'file' not in request.files:
+            return jsonify({
+                'status': 'error',
+                'message': 'No image file provided'
+            }), 400
+
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({
+                'status': 'error',
+                'message': 'No image selected'
+            }), 400
+
+        if not file.mimetype.startswith('image/'):
+            return jsonify({
+                'status': 'error',
+                'message': 'Only image files are allowed'
+            }), 400
+
+        product_image_service.save_product_image(product.product_name, file.stream)
+
+        return jsonify({
+            'status': 'success',
+            'message': 'Product image updated successfully',
+            'data': product_to_dict(product)
+        }), 200
+
+    except UnidentifiedImageError:
+        return jsonify({
+            'status': 'error',
+            'message': 'The uploaded file is not a readable image'
+        }), 400
+    except Exception as e:
+        logger.error(f"Error updating product image {product_id}: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': f"Error updating product image: {str(e)}"
+        }), 500
 
 
 @product_bp.route('/', methods=['GET'])
@@ -23,7 +103,7 @@ def get_all_products():
         
         return jsonify({
             'status': 'success',
-            'data': [product.to_dict() for product in paginated.items],
+            'data': [product_to_dict(product) for product in paginated.items],
             'pagination': {
                 'page': page,
                 'per_page': per_page,
@@ -36,6 +116,32 @@ def get_all_products():
         return jsonify({
             'status': 'error',
             'message': f"Error fetching products: {str(e)}"
+        }), 500
+
+
+@product_bp.route('/export', methods=['GET'])
+def export_products():
+    """Export all products as a CSV sheet that can be imported after rate updates."""
+    try:
+        products = Product.query.order_by(
+            Product.serial_no.is_(None),
+            Product.serial_no,
+            Product.product_name,
+        ).all()
+        content = products_to_csv(products)
+
+        return Response(
+            content,
+            mimetype='text/csv',
+            headers={
+                'Content-Disposition': 'attachment; filename=all_products_rate_update.csv',
+            },
+        )
+    except Exception as e:
+        logger.error(f"Error exporting products: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': f"Error exporting products: {str(e)}"
         }), 500
 
 
@@ -86,7 +192,7 @@ def get_product(product_id):
         product = Product.query.get_or_404(product_id)
         return jsonify({
             'status': 'success',
-            'data': product.to_dict()
+            'data': product_to_dict(product)
         }), 200
     except Exception as e:
         logger.error(f"Error fetching product {product_id}: {str(e)}")
@@ -140,13 +246,19 @@ def create_product():
         )
         
         db.session.add(product)
+        db.session.add(ProductRateHistory(
+            product=product,
+            old_price_aed=None,
+            new_price_aed=price_aed,
+            changed_by='manual',
+        ))
         db.session.commit()
         
         logger.info(f"✓ Created product: {product.product_name}")
         return jsonify({
             'status': 'success',
             'message': 'Product created successfully',
-            'data': product.to_dict()
+            'data': product_to_dict(product)
         }), 201
     
     except Exception as e:
@@ -164,6 +276,7 @@ def update_product(product_id):
     try:
         product = Product.query.get_or_404(product_id)
         data = request.get_json()
+        old_price_aed = float(product.price_aed)
         
         # Update allowed fields
         allowed_fields = [
@@ -197,13 +310,21 @@ def update_product(product_id):
                 else:
                     setattr(product, field, data[field].strip() if isinstance(data[field], str) else data[field])
         
+        if 'price_aed' in data and float(product.price_aed) != old_price_aed:
+            db.session.add(ProductRateHistory(
+                product=product,
+                old_price_aed=old_price_aed,
+                new_price_aed=float(product.price_aed),
+                changed_by='manual',
+            ))
+
         db.session.commit()
         logger.info(f"✓ Updated product: {product.product_name}")
         
         return jsonify({
             'status': 'success',
             'message': 'Product updated successfully',
-            'data': product.to_dict()
+            'data': product_to_dict(product)
         }), 200
     
     except Exception as e:

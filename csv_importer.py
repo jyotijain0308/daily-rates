@@ -5,7 +5,7 @@ import csv
 import logging
 from io import StringIO, TextIOWrapper
 from typing import List, Dict, Tuple
-from models import Product
+from models import Product, ProductRateHistory
 from wsgi import db
 
 logger = logging.getLogger(__name__)
@@ -18,6 +18,7 @@ class CSVImportError(Exception):
 
 class ProductCSVImporter:
     """Handle CSV import for products"""
+    LARGE_RATE_CHANGE_PERCENT = 20.0
     
     CSV_COLUMNS = [
         'S.No.',
@@ -131,63 +132,221 @@ class ProductCSVImporter:
             errors.append(f"Error parsing CSV: {str(e)}")
         
         return valid_rows, errors
+
+    @staticmethod
+    def _row_key(row: Dict) -> Tuple[str, str]:
+        return (
+            row['product_name'].strip().lower(),
+            row['country_of_origin'].strip().lower(),
+        )
+
+    @staticmethod
+    def _rate_diff(old_price, new_price) -> Dict:
+        if old_price is None:
+            return {
+                'change_amount': None,
+                'change_percent': None,
+                'large_change': False,
+            }
+
+        change_amount = new_price - old_price
+        if old_price == 0:
+            change_percent = None
+            large_change = new_price != 0
+        else:
+            change_percent = (change_amount / old_price) * 100
+            large_change = abs(change_percent) >= ProductCSVImporter.LARGE_RATE_CHANGE_PERCENT
+
+        return {
+            'change_amount': change_amount,
+            'change_percent': change_percent,
+            'large_change': large_change,
+        }
+
+    @staticmethod
+    def build_import_plan(rows: List[Dict]) -> Dict:
+        """Build create/update/skip decisions for valid CSV rows."""
+        products = Product.query.all()
+        existing_by_key = {
+            (product.product_name.strip().lower(), product.country_of_origin.strip().lower()): product
+            for product in products
+        }
+
+        plan_rows = []
+        summary = {
+            'created_count': 0,
+            'updated_count': 0,
+            'skipped_count': 0,
+            'large_change_count': 0,
+        }
+
+        seen_keys = set()
+        duplicate_count = 0
+
+        for row in rows:
+            key = ProductCSVImporter._row_key(row)
+            if key in seen_keys:
+                duplicate_count += 1
+                plan_rows.append({
+                    **row,
+                    'action': 'skipped',
+                    'reason': 'Duplicate row in uploaded file',
+                    'old_price_aed': None,
+                    'new_price_aed': float(row['price_aed']),
+                    'change_amount': None,
+                    'change_percent': None,
+                    'large_change': False,
+                })
+                summary['skipped_count'] += 1
+                continue
+            seen_keys.add(key)
+
+            product = existing_by_key.get(key)
+            new_price = float(row['price_aed'])
+
+            if not product:
+                diff = ProductCSVImporter._rate_diff(None, new_price)
+                plan_rows.append({
+                    **row,
+                    'action': 'created',
+                    'reason': 'New product',
+                    'old_price_aed': None,
+                    'new_price_aed': new_price,
+                    **diff,
+                })
+                summary['created_count'] += 1
+                continue
+
+            old_price = float(product.price_aed)
+            next_values = {
+                'serial_no': int(row['serial_no']),
+                'shipment_by': row['shipment_by'].strip(),
+                'weight_kg': float(row['weight_kg']),
+                'packing': row['packing'].strip(),
+                'price_aed': new_price,
+            }
+            current_values = {
+                'serial_no': product.serial_no,
+                'shipment_by': product.shipment_by,
+                'weight_kg': float(product.weight_kg),
+                'packing': product.packing,
+                'price_aed': old_price,
+            }
+            has_changes = any(current_values[field] != next_values[field] for field in next_values)
+            diff = ProductCSVImporter._rate_diff(old_price, new_price)
+
+            if has_changes:
+                action = 'updated'
+                reason = 'Existing product will be updated'
+                summary['updated_count'] += 1
+                if diff['large_change']:
+                    summary['large_change_count'] += 1
+            else:
+                action = 'skipped'
+                reason = 'No changes'
+                summary['skipped_count'] += 1
+
+            plan_rows.append({
+                **row,
+                'action': action,
+                'reason': reason,
+                'old_price_aed': old_price,
+                'new_price_aed': new_price,
+                **diff,
+            })
+
+        if duplicate_count:
+            logger.info(f"Skipped {duplicate_count} duplicate row(s) in import plan")
+
+        return {
+            **summary,
+            'rows': plan_rows,
+        }
     
     @staticmethod
-    def import_products(rows: List[Dict]) -> Tuple[int, List[str]]:
+    def import_products(rows: List[Dict], changed_by: str = 'import') -> Tuple[Dict, List[str]]:
         """
         Insert new products and update existing products by Product Name + Country of origin.
-        Returns: (count_imported, error_messages)
+        Returns: (summary, error_messages)
         """
-        imported_count = 0
+        summary = {
+            'created_count': 0,
+            'updated_count': 0,
+            'skipped_count': 0,
+            'rate_history_count': 0,
+            'large_change_count': 0,
+            'imported_count': 0,
+        }
         errors = []
         
         if not rows:
-            return 0, ["No valid products to import"]
+            return summary, ["No valid products to import"]
         
         try:
-            for row in rows:
+            plan = ProductCSVImporter.build_import_plan(rows)
+            summary['large_change_count'] = plan['large_change_count']
+
+            for plan_row in plan['rows']:
+                if plan_row['action'] == 'skipped':
+                    summary['skipped_count'] += 1
+                    continue
+
                 try:
-                    product_name = row['product_name'].strip()
-                    country_of_origin = row['country_of_origin'].strip()
+                    product_name = plan_row['product_name'].strip()
+                    country_of_origin = plan_row['country_of_origin'].strip()
+                    new_price = float(plan_row['price_aed'])
                     product = Product.query.filter_by(
                         product_name=product_name,
                         country_of_origin=country_of_origin,
                     ).first()
 
                     if product:
-                        product.serial_no = int(row['serial_no'])
-                        product.shipment_by = row['shipment_by'].strip()
-                        product.weight_kg = float(row['weight_kg'])
-                        product.packing = row['packing'].strip()
-                        product.price_aed = float(row['price_aed'])
+                        old_price = float(product.price_aed)
+                        product.serial_no = int(plan_row['serial_no'])
+                        product.shipment_by = plan_row['shipment_by'].strip()
+                        product.weight_kg = float(plan_row['weight_kg'])
+                        product.packing = plan_row['packing'].strip()
+                        product.price_aed = new_price
+                        summary['updated_count'] += 1
                     else:
+                        old_price = None
                         product = Product(
-                            serial_no=int(row['serial_no']),
+                            serial_no=int(plan_row['serial_no']),
                             country_of_origin=country_of_origin,
-                            shipment_by=row['shipment_by'].strip(),
+                            shipment_by=plan_row['shipment_by'].strip(),
                             product_name=product_name,
-                            weight_kg=float(row['weight_kg']),
-                            packing=row['packing'].strip(),
-                            price_aed=float(row['price_aed']),
+                            weight_kg=float(plan_row['weight_kg']),
+                            packing=plan_row['packing'].strip(),
+                            price_aed=new_price,
                         )
                         db.session.add(product)
+                        summary['created_count'] += 1
 
-                    imported_count += 1
+                    if old_price != new_price:
+                        db.session.add(ProductRateHistory(
+                            product=product,
+                            old_price_aed=old_price,
+                            new_price_aed=new_price,
+                            changed_by=changed_by,
+                        ))
+                        summary['rate_history_count'] += 1
+
+                    summary['imported_count'] += 1
                 except Exception as e:
                     errors.append(
-                        f"Error importing {row.get('product_name', 'unknown product')}: {str(e)}"
+                        f"Error importing {plan_row.get('product_name', 'unknown product')}: {str(e)}"
                     )
 
-            if imported_count:
+            if summary['imported_count']:
                 db.session.commit()
-                logger.info(f"✓ Imported {imported_count} products from CSV")
+                logger.info(f"✓ Imported {summary['imported_count']} products from CSV")
         
         except Exception as e:
             db.session.rollback()
             errors.append(f"Database error during import: {str(e)}")
             logger.error(f"✗ Import failed: {str(e)}")
         
-        return imported_count, errors
+        return summary, errors
     
     @staticmethod
     def import_from_file(file_path: str) -> Tuple[int, List[str], List[Dict]]:
@@ -208,13 +367,13 @@ class ProductCSVImporter:
         errors.extend(parse_errors)
         
         # Import valid rows
-        imported_count, import_errors = ProductCSVImporter.import_products(valid_rows)
+        import_summary, import_errors = ProductCSVImporter.import_products(valid_rows)
         errors.extend(import_errors)
         
         # Generate preview data (first 5 valid rows)
         preview_data = valid_rows[:5]
         
-        return imported_count, errors, preview_data
+        return import_summary['imported_count'], errors, preview_data
 
 
 def get_csv_template() -> str:
@@ -234,6 +393,26 @@ def get_sample_csv() -> str:
         "6,Vietnam,Sea,Black Pepper,5,Carton,64.50",
     ]
     return header + "\n".join(rows) + "\n"
+
+
+def products_to_csv(products: List[Product]) -> str:
+    """Serialize products to the same CSV contract accepted by import."""
+    output = StringIO()
+    writer = csv.writer(output)
+    writer.writerow(ProductCSVImporter.CSV_COLUMNS)
+
+    for index, product in enumerate(products, start=1):
+        writer.writerow([
+            product.serial_no if product.serial_no is not None else index,
+            product.country_of_origin,
+            product.shipment_by,
+            product.product_name,
+            product.weight_kg,
+            product.packing,
+            product.price_aed,
+        ])
+
+    return output.getvalue()
 
 
 SAMPLE_CSV_FILENAME = "sample_daily_product_rates.csv"

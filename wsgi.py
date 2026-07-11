@@ -3,26 +3,43 @@ Flask application factory and initialization
 """
 import os
 import logging
+import sys
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 from sqlalchemy import inspect, text
 
+try:
+    from flask_migrate import Migrate
+except ImportError:
+    Migrate = None
+
 # Initialize extensions
 db = SQLAlchemy()
+migrate = Migrate() if Migrate else None
 
 logger = logging.getLogger(__name__)
+
+
+def get_database_uri() -> str:
+    """Return the configured database URI, defaulting to local SQLite."""
+    database_url = os.getenv('DATABASE_URL')
+    if not database_url:
+        return 'sqlite:///ppt_products.db'
+
+    # Some platforms still expose SQLAlchemy's old postgres:// scheme.
+    if database_url.startswith('postgres://'):
+        return database_url.replace('postgres://', 'postgresql+psycopg://', 1)
+    if database_url.startswith('postgresql://'):
+        return database_url.replace('postgresql://', 'postgresql+psycopg://', 1)
+
+    return database_url
 
 
 def ensure_database_schema():
     """Rebuild old local product schemas to the current CSV-backed shape."""
     inspector = inspect(db.engine)
     table_names = inspector.get_table_names()
-
-    if 'product_rate_history' in table_names:
-        db.session.execute(text("DROP TABLE product_rate_history"))
-        db.session.commit()
-        logger.info("Dropped obsolete product_rate_history table")
 
     if 'products' in table_names:
         product_columns = {column['name'] for column in inspector.get_columns('products')}
@@ -68,6 +85,11 @@ def ensure_database_schema():
             logger.info("Rebuilt products table for shipment product schema")
 
 
+def is_flask_migration_command() -> bool:
+    """Return True when Flask-Migrate/Alembic should manage schema changes."""
+    return 'db' in sys.argv
+
+
 def create_app(config=None):
     """Application factory function"""
     app = Flask(__name__, 
@@ -75,7 +97,7 @@ def create_app(config=None):
                 static_folder='app/static')
     
     # Default configuration
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///ppt_products.db'
+    app.config['SQLALCHEMY_DATABASE_URI'] = get_database_uri()
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file upload
     app.config['UPLOAD_FOLDER'] = 'uploads'
@@ -86,6 +108,13 @@ def create_app(config=None):
     
     # Initialize extensions
     db.init_app(app)
+    if migrate:
+        migrate.init_app(app, db)
+    elif is_flask_migration_command():
+        raise RuntimeError(
+            "Flask-Migrate is required for migration commands. "
+            "Install dependencies with: python3 -m pip install -r requirements.txt"
+        )
     CORS(app, resources={r"/api/*": {"origins": "*"}})
     
     # Create necessary directories
@@ -99,11 +128,13 @@ def create_app(config=None):
     # Register blueprints
     with app.app_context():
         # Import models
-        from models import Product, GenerationHistory
+        from models import Product, ProductRateHistory, GenerationHistory
 
-        # Create tables
-        db.create_all()
-        ensure_database_schema()
+        # Local/test startup keeps backward compatibility. Migration commands
+        # skip this so Alembic can create/upgrade tables itself.
+        if not is_flask_migration_command():
+            db.create_all()
+            ensure_database_schema()
         logger.info("Database initialized")
         
         # Register route blueprints

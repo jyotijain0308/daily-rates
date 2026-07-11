@@ -1,0 +1,11 @@
+Database migrations for PPT Daily Rates System.
+
+Use:
+
+    export FLASK_APP=wsgi:create_app
+    flask db upgrade
+
+For an existing database that was previously managed with db.create_all(), deploy the
+code once so startup can create any missing tables, then run:
+
+    flask db stamp head

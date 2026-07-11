@@ -25,6 +25,10 @@ PEXELS_API_URL = "https://api.pexels.com/v1/search"
 PRODUCT_IMAGE_PROVIDER = "pexels"
 PRODUCT_IMAGE_AUTO_FETCH = os.getenv("PRODUCT_IMAGE_AUTO_FETCH", "true").lower() == "true"
 PRODUCT_IMAGE_FETCH_TIMEOUT_SECONDS = 10
+PRODUCT_IMAGE_SEARCH_CATEGORY = "fruits, vegetables or spices"
+PRODUCT_IMAGE_MAX_WIDTH = 1200
+PRODUCT_IMAGE_MAX_HEIGHT = 800
+PRODUCT_IMAGE_JPEG_QUALITY = 85
 
 # Presentation Settings
 SLIDE_WIDTH = Inches(10)
@@ -73,6 +77,15 @@ OUTPUT_PPT_FILE = "output/daily_rates.pptx"
 OUTPUT_CLEANUP_ENABLED = True
 OUTPUT_CLEANUP_DIRS = ["output", "src/output"]
 OUTPUT_CLEANUP_EXTENSIONS = [".pptx", ".mp4"]
+
+# Image table import settings
+IMAGE_IMPORT_ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "webp", "bmp", "tiff"}
+OCR_TESSERACT_CONFIG = "--psm 6"
+PDF_TABLE_EXTRACTION_PROVIDER = os.getenv("PDF_TABLE_EXTRACTION_PROVIDER", "ollama").lower()
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+OPENAI_PDF_EXTRACTION_MODEL = os.getenv("OPENAI_PDF_EXTRACTION_MODEL", "gpt-4o-mini")
+OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+OLLAMA_PDF_EXTRACTION_MODEL = os.getenv("OLLAMA_PDF_EXTRACTION_MODEL", "llama3.2-vision")
 
 # Product Rate Format
 CURRENCY = "AED"

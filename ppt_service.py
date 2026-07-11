@@ -8,11 +8,13 @@ import re
 from datetime import datetime
 from pathlib import Path
 
-# Import existing PPT generation modules
+# Import existing generation modules
 import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
-from src.ppt_generator import PPTGenerator
+# PPT generation is intentionally disabled for now. Keep the import commented
+# so it can be restored when PPT output is needed again.
+# from src.ppt_generator import PPTGenerator
 from src.video_generator import MP4Generator
 from src.exchange_rates import ExchangeRateService
 from src.product_data import ProductData
@@ -24,12 +26,13 @@ logger = logging.getLogger(__name__)
 
 
 class PPTGenerationService:
-    """Service to generate PPT from database products"""
+    """Service to generate MP4 videos from database products."""
     
     @staticmethod
-    def generate_ppt(products_list=None, custom_filename=None, country_filter=None, output_format='ppt'):
+    def generate_ppt(products_list=None, custom_filename=None, country_filter=None,
+                     shipment_filter=None, output_format='mp4'):
         """
-        Generate PPT from products
+        Generate MP4 from products.
         
         Args:
             products_list: List of Product objects (if None, fetch all from DB)
@@ -40,14 +43,14 @@ class PPTGenerationService:
         """
         try:
             # Fetch products if not provided
-            output_format = (output_format or 'ppt').lower()
-            if output_format not in {'ppt', 'mp4'}:
-                return False, {}, "Unsupported output format. Use 'ppt' or 'mp4'."
+            output_format = 'mp4'
 
             if products_list is None:
                 query = Product.query
                 if country_filter:
                     query = query.filter_by(country_of_origin=country_filter)
+                if shipment_filter:
+                    query = query.filter_by(shipment_by=shipment_filter)
                 products_list = query.all()
             
             if not products_list:
@@ -66,7 +69,12 @@ class PPTGenerationService:
                     'price_aed': product.price_aed,
                 })
             
-            logger.info(f"Starting country {output_format.upper()} generation with {len(products_data)} products")
+            logger.info(
+                "Starting country %s generation with %s products%s",
+                output_format.upper(),
+                len(products_data),
+                f" for shipment {shipment_filter}" if shipment_filter else "",
+            )
 
             products_by_country = {}
             for product_data in products_data:
@@ -83,8 +91,15 @@ class PPTGenerationService:
             generated_files = []
 
             for country, country_products in sorted(products_by_country.items()):
-                generator = MP4Generator() if output_format == 'mp4' else PPTGenerator()
-                generator.add_country_title_slide(country, current_date=datetime.now())
+                generator = MP4Generator()
+                # PPT generation is disabled for now.
+                # generator = PPTGenerator()
+                shipment_label = shipment_filter or country_products[0].get('shipment_by')
+                generator.add_country_title_slide(
+                    country,
+                    current_date=datetime.now(),
+                    shipment_by=shipment_label,
+                )
 
                 for idx, product_data in enumerate(country_products, 1):
                     product_obj = ProductData(
@@ -108,8 +123,11 @@ class PPTGenerationService:
                 if custom_filename and len(products_by_country) == 1:
                     output_path = os.path.join('output', custom_filename)
                 else:
-                    slug = PPTGenerationService._slugify(country)
-                    extension = 'mp4' if output_format == 'mp4' else 'pptx'
+                    slug_parts = [PPTGenerationService._slugify(country)]
+                    if shipment_label:
+                        slug_parts.append(PPTGenerationService._slugify(shipment_label))
+                    slug = "_".join(slug_parts)
+                    extension = 'mp4'
                     output_path = os.path.join('output', f'{slug}_products_price_list_{timestamp}.{extension}')
 
                 os.makedirs(os.path.dirname(output_path) or '.', exist_ok=True)
@@ -121,6 +139,7 @@ class PPTGenerationService:
                     'filepath': output_path,
                     'filename': os.path.basename(output_path),
                     'product_count': len(country_products),
+                    'shipment_by': shipment_label,
                     'currency_code': currency_code,
                     'exchange_rate': exchange_rates.get(currency_code) if currency_code else None,
                     'format': output_format,
@@ -132,6 +151,7 @@ class PPTGenerationService:
                 'filepath': first_file['filepath'],
                 'filename': first_file['filename'],
                 'product_count': len(products_data),
+                'shipment_by': first_file.get('shipment_by'),
                 'country_count': len(generated_files),
             }
 
@@ -170,7 +190,7 @@ class PPTGenerationService:
     def _record_generation(file_path, product_count, status, error_msg=None):
         """Record PPT generation in database"""
         try:
-            filename = os.path.basename(file_path) if file_path else f"failed_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pptx"
+            filename = os.path.basename(file_path) if file_path else f"failed_{datetime.now().strftime('%Y%m%d_%H%M%S')}.mp4"
             
             generation = GenerationHistory(
                 filename=filename,

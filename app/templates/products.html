@@ -8,10 +8,14 @@
         <h1>Product Management</h1>
         <p class="subtitle">View and edit product rates inline</p>
     </div>
-    <button type="button" class="btn btn-primary" id="addProductBtn">+ Add Product</button>
+    <div class="page-header-actions">
+        <a class="btn btn-secondary" href="/api/products/export">Export Rate Sheet</a>
+        <button type="button" class="btn btn-primary" id="addProductBtn">+ Add Product</button>
+    </div>
 </section>
 
 <section class="card">
+    <input type="file" id="productImageInput" accept="image/*" hidden>
     <div class="card-header-row">
         <div class="search-box">
             <input type="search" id="productSearch" placeholder="Search products..." class="input">
@@ -23,6 +27,7 @@
         <table class="data-table" id="productsTable">
             <thead>
                 <tr>
+                    <th>Image</th>
                     <th>Name</th>
                     <th>Country of origin</th>
                     <th>Shipment by</th>
@@ -34,7 +39,7 @@
                 </tr>
             </thead>
             <tbody id="productsBody">
-                <tr><td colspan="8" class="empty-state">Loading products...</td></tr>
+                <tr><td colspan="9" class="empty-state">Loading products...</td></tr>
             </tbody>
         </table>
     </div>
@@ -84,6 +89,19 @@
                 <button type="submit" class="btn btn-primary">Save Product</button>
             </div>
         </form>
+    </div>
+</div>
+
+<div class="modal-overlay" id="imagePreviewModal" style="display:none;">
+    <div class="modal image-preview-modal">
+        <div class="modal-header">
+            <h2 id="imagePreviewTitle">Product Image</h2>
+            <button type="button" class="modal-close" id="closeImagePreviewBtn">&times;</button>
+        </div>
+        <img id="imagePreviewImg" class="image-preview-img" src="" alt="">
+        <div class="form-actions">
+            <button type="button" class="btn btn-secondary" id="replaceImageBtn">Update Image</button>
+        </div>
     </div>
 </div>
 {% endblock %}

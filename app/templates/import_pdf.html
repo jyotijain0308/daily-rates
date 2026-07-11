@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+
+{% block title %}Import PDF — PPT Daily Rates{% endblock %}
+
+{% block content %}
+<section class="page-header">
+    <div>
+        <h1>Import PDF</h1>
+        <p class="subtitle">Upload a text-based PDF, convert its product table to CSV, then save to the database</p>
+    </div>
+    <div class="page-header-actions">
+        <a href="/import" class="btn btn-secondary">CSV / Image Import</a>
+    </div>
+</section>
+
+<section class="card">
+    <h2>Upload PDF</h2>
+    <p class="text-muted sample-hint">
+        The PDF table is read by column order: S.No., Country of origin, Shipment by, Product Name, Weight in kg, Packing, Price in AED.
+    </p>
+    <div class="upload-zone" id="pdfUploadZone">
+        <input type="file" id="pdfFileInput" accept="application/pdf,.pdf" hidden>
+        <div class="upload-content">
+            <span class="upload-icon">PDF</span>
+            <p><strong>Drop your PDF here</strong> or click to browse</p>
+            <p class="text-muted">Best for text-based PDFs. Scanned PDFs need OCR/image import.</p>
+        </div>
+    </div>
+    <div id="selectedPdfInfo" class="selected-file" style="display:none;"></div>
+</section>
+
+<section class="card" id="pdfPreviewSection" style="display:none;">
+    <div class="card-header-row">
+        <h2>Extracted CSV Preview</h2>
+        <div class="preview-badges">
+            <span class="badge badge-success" id="pdfValidCountBadge">0 valid</span>
+            <span class="badge badge-error" id="pdfErrorCountBadge" style="display:none;">0 errors</span>
+        </div>
+    </div>
+
+    <div id="pdfErrorList" class="error-list" style="display:none;"></div>
+
+    <div class="table-wrap">
+        <table class="data-table" id="pdfPreviewTable">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Country of origin</th>
+                    <th>Shipment by</th>
+                    <th>Weight in kg</th>
+                    <th>Packing</th>
+                    <th>Price in AED</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+    <div class="form-actions">
+        <button type="button" class="btn btn-secondary" id="cancelPdfImportBtn">Cancel</button>
+        <button type="button" class="btn btn-secondary" id="downloadExtractedCsvBtn" disabled>Download CSV</button>
+        <button type="button" class="btn btn-primary" id="savePdfImportBtn" disabled>Save to Database</button>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/import_pdf.js') }}"></script>
+{% endblock %}

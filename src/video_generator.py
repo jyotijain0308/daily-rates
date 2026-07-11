@@ -132,8 +132,8 @@ class MP4Generator:
     def _blank(self, background="background"):
         return Image.new("RGBA", (self.WIDTH, self.HEIGHT), self._rgb(background) + (255,))
 
-    def _product_image_path(self, product_name: str) -> Optional[str]:
-        return self.product_images.get_product_image_path(product_name)
+    def _product_image_path(self, product_name: str, country_of_origin: Optional[str] = None) -> Optional[str]:
+        return self.product_images.get_product_image_path(product_name, country_of_origin)
 
     def _paste_fit_image_or_text(self, image, draw, image_path, fallback_text, box, text_fill):
         left, top, width, height = box
@@ -157,7 +157,8 @@ class MP4Generator:
         for _ in range(self.SECONDS_PER_SLIDE * self.FPS):
             self.frames.append(np.asarray(rgb_frame))
 
-    def add_country_title_slide(self, country_name: str, current_date: datetime = None):
+    def add_country_title_slide(self, country_name: str, current_date: datetime = None,
+                                shipment_by: Optional[str] = None):
         if current_date is None:
             current_date = datetime.now()
 
@@ -175,9 +176,17 @@ class MP4Generator:
             draw, f"{country_name} Products Price List",
             self.font_title, 418, self._rgb("primary"), self.WIDTH - 140
         )
+        if shipment_by:
+            self._draw_centered_text(
+                draw, f"Shipment by: {shipment_by}",
+                self.font_heading, 500, self._rgb("accent"), self.WIDTH - 140
+            )
+            date_y = 590
+        else:
+            date_y = 562
         self._draw_centered_text(
             draw, current_date.strftime("%B %d, %Y"),
-            self.font_heading, 562, self._rgb("text")
+            self.font_heading, date_y, self._rgb("text")
         )
         self._append_slide(frame)
 
@@ -195,12 +204,16 @@ class MP4Generator:
         )
 
         self._draw_centered_text(
-            draw, f"{product.product_name} {product.weight_kg:g}kg {product.packing}",
+            draw, product.product_name,
             self.font_title, 120, self._rgb("primary"), self.WIDTH - 140
         )
+        self._draw_centered_text(
+            draw, f"{product.weight_kg:g}kg | {product.packing}",
+            self.font_regular, 205, self._rgb("accent"), self.WIDTH - 180
+        )
         self._paste_fit_image_or_text(
-            frame, draw, self._product_image_path(product.product_name), product.product_name,
-            (190, 235, 900, 230), self._rgb("primary")
+            frame, draw, self._product_image_path(product.product_name, product.country_of_origin), product.product_name,
+            (190, 270, 900, 195), self._rgb("primary")
         )
 
         band = (150, 525, self.WIDTH - 150, 625)

@@ -3,7 +3,7 @@ Database initialization and management utilities
 """
 import logging
 from wsgi import create_app, db
-from models import Product, GenerationHistory
+from models import Product, ProductRateHistory, GenerationHistory
 
 logger = logging.getLogger(__name__)
 

@@ -49,6 +49,15 @@ const API = {
         });
     },
 
+    updateProductImage(id, file) {
+        const formData = new FormData();
+        formData.append('file', file);
+        return this.request(`/api/products/${id}/image`, {
+            method: 'POST',
+            body: formData,
+        });
+    },
+
     deleteProduct(id) {
         return this.request(`/api/products/${id}`, { method: 'DELETE' });
     },
@@ -57,6 +66,24 @@ const API = {
         const formData = new FormData();
         formData.append('file', file);
         return this.request('/api/import/preview', {
+            method: 'POST',
+            body: formData,
+        });
+    },
+
+    previewImageImport(file) {
+        const formData = new FormData();
+        formData.append('file', file);
+        return this.request('/api/import/preview-image', {
+            method: 'POST',
+            body: formData,
+        });
+    },
+
+    previewPdfImport(file) {
+        const formData = new FormData();
+        formData.append('file', file);
+        return this.request('/api/import/preview-pdf', {
             method: 'POST',
             body: formData,
         });
@@ -98,6 +125,10 @@ const API = {
 
     downloadUrl(filename) {
         return `/api/generation/download/${encodeURIComponent(filename)}`;
+    },
+
+    previewUrl(filename) {
+        return `/api/generation/preview/${encodeURIComponent(filename)}`;
     },
 };
 

@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 
-{% block title %}Generate File — PPT Daily Rates{% endblock %}
+{% block title %}Generate Video — PPT Daily Rates{% endblock %}
 
 {% block content %}
 <section class="page-header">
     <div>
-        <h1>Generate Presentation</h1>
-        <p class="subtitle">Create a PPT or MP4 for a selected country</p>
+        <h1>Generate Video</h1>
+        <p class="subtitle">Create an MP4 video for a selected country</p>
     </div>
 </section>
 
@@ -35,10 +35,9 @@
             </select>
         </div>
         <div class="form-group">
-            <label for="formatSelect">Format</label>
-            <select id="formatSelect" class="input">
-                <option value="ppt">PPT</option>
-                <option value="mp4">MP4</option>
+            <label for="shipmentSelect">Shipment by</label>
+            <select id="shipmentSelect" class="input" disabled>
+                <option value="">Select shipment</option>
             </select>
         </div>
     </div>
@@ -48,9 +47,17 @@
             Generate
         </button>
         <a href="#" class="btn btn-success btn-lg" id="downloadBtn" style="display:none;">
-            Download File
+            Download Video
         </a>
     </div>
+</section>
+
+<section class="card" id="videoPreviewSection" style="display:none;">
+    <div class="card-header-row">
+        <h2>MP4 Preview</h2>
+        <a href="#" class="btn btn-sm btn-secondary" id="previewDownloadBtn">Download MP4</a>
+    </div>
+    <video id="mp4Preview" class="mp4-preview" controls preload="metadata"></video>
 </section>
 
 <section class="card" id="latestSection" style="display:none;">

@@ -98,8 +98,8 @@ class PPTGenerator:
         fill.solid()
         fill.fore_color.rgb = COLORS[color_key]
 
-    def _product_image_path(self, product_name: str) -> Optional[str]:
-        return self.product_images.get_product_image_path(product_name)
+    def _product_image_path(self, product_name: str, country_of_origin: Optional[str] = None) -> Optional[str]:
+        return self.product_images.get_product_image_path(product_name, country_of_origin)
 
     def add_country_title_slide(self, country_name: str, current_date: datetime = None):
         """Create country-specific title slide."""
@@ -182,7 +182,7 @@ class PPTGenerator:
         p.alignment = PP_ALIGN.CENTER
 
         self._add_image_or_text(
-            slide, self._product_image_path(product.product_name), product.product_name,
+            slide, self._product_image_path(product.product_name, product.country_of_origin), product.product_name,
             Inches(1.25), Inches(2.25), Inches(7.5), Inches(2.25),
             fit_to_box=True
         )

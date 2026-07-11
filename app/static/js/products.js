@@ -5,15 +5,36 @@ const productSearch = document.getElementById('productSearch');
 const productCount = document.getElementById('productCount');
 const productModal = document.getElementById('productModal');
 const productForm = document.getElementById('productForm');
+const imagePreviewModal = document.getElementById('imagePreviewModal');
+const imagePreviewImg = document.getElementById('imagePreviewImg');
+const imagePreviewTitle = document.getElementById('imagePreviewTitle');
+const productImageInput = document.getElementById('productImageInput');
+const replaceImageBtn = document.getElementById('replaceImageBtn');
+let selectedImageProductId = null;
 
 document.getElementById('addProductBtn').addEventListener('click', () => openModal());
 document.getElementById('closeModalBtn').addEventListener('click', closeModal);
 document.getElementById('cancelModalBtn').addEventListener('click', closeModal);
+document.getElementById('closeImagePreviewBtn').addEventListener('click', closeImagePreview);
+replaceImageBtn.addEventListener('click', () => {
+    if (selectedImageProductId) openImageUpload(selectedImageProductId);
+});
+productImageInput.addEventListener('change', handleProductImageSelected);
 productForm.addEventListener('submit', handleFormSubmit);
 productSearch.addEventListener('input', renderProducts);
 
 productModal.addEventListener('click', (e) => {
     if (e.target === productModal) closeModal();
+});
+
+imagePreviewModal.addEventListener('click', (e) => {
+    if (e.target === imagePreviewModal) closeImagePreview();
+});
+
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && imagePreviewModal.style.display !== 'none') {
+        closeImagePreview();
+    }
 });
 
 loadProducts();
@@ -36,7 +57,7 @@ async function loadProducts() {
         productCount.textContent = `${result.pagination.total} product${result.pagination.total !== 1 ? 's' : ''}`;
         renderProducts();
     } catch (err) {
-        productsBody.innerHTML = `<tr><td colspan="8" class="empty-state">${err.message}</td></tr>`;
+        productsBody.innerHTML = `<tr><td colspan="9" class="empty-state">${err.message}</td></tr>`;
         showError(err.message);
     }
 }
@@ -50,13 +71,18 @@ function renderProducts() {
     );
 
     if (filtered.length === 0) {
-        productsBody.innerHTML = '<tr><td colspan="8" class="empty-state">No products found. Import CSV or add a product.</td></tr>';
+        productsBody.innerHTML = '<tr><td colspan="9" class="empty-state">No products found. Import CSV or add a product.</td></tr>';
         return;
     }
 
     productsBody.innerHTML = filtered.map(p => {
+        const imageCell = p.image_url
+            ? `<button type="button" class="product-thumb-btn" data-id="${p.id}" aria-label="View ${escapeHtml(p.product_name)} image"><img class="product-thumb" src="${escapeHtml(p.image_url)}" alt="${escapeHtml(p.product_name)}"></button>`
+            : '<span class="product-thumb product-thumb-empty">No image</span>';
+
         return `
             <tr data-id="${p.id}">
+                <td>${imageCell}</td>
                 <td class="editable" data-field="product_name">${escapeHtml(p.product_name)}</td>
                 <td class="editable" data-field="country_of_origin">${escapeHtml(p.country_of_origin)}</td>
                 <td class="editable" data-field="shipment_by">${escapeHtml(p.shipment_by)}</td>
@@ -65,6 +91,7 @@ function renderProducts() {
                 <td class="editable" data-field="price_aed">AED ${formatRate(p.price_aed)}</td>
                 <td class="text-muted">${formatDate(p.updated_at)}</td>
                 <td>
+                    <button class="btn btn-sm btn-secondary image-btn" data-id="${p.id}">Image</button>
                     <button class="btn btn-sm btn-secondary edit-btn" data-id="${p.id}">Edit</button>
                     <button class="btn btn-sm btn-danger delete-btn" data-id="${p.id}">Delete</button>
                 </td>
@@ -76,6 +103,13 @@ function renderProducts() {
         cell.addEventListener('dblclick', () => startInlineEdit(cell));
     });
 
+    productsBody.querySelectorAll('.product-thumb-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const product = products.find(p => p.id === parseInt(btn.dataset.id));
+            if (product) openImagePreview(product);
+        });
+    });
+
     productsBody.querySelectorAll('.edit-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             const product = products.find(p => p.id === parseInt(btn.dataset.id));
@@ -83,9 +117,60 @@ function renderProducts() {
         });
     });
 
+    productsBody.querySelectorAll('.image-btn').forEach(btn => {
+        btn.addEventListener('click', () => openImageUpload(parseInt(btn.dataset.id)));
+    });
+
     productsBody.querySelectorAll('.delete-btn').forEach(btn => {
         btn.addEventListener('click', () => deleteProduct(parseInt(btn.dataset.id)));
     });
+}
+
+function openImagePreview(product) {
+    if (!product.image_url) return;
+
+    selectedImageProductId = product.id;
+    imagePreviewTitle.textContent = product.product_name;
+    imagePreviewImg.src = product.image_url;
+    imagePreviewImg.alt = product.product_name;
+    imagePreviewModal.style.display = 'flex';
+}
+
+function closeImagePreview() {
+    imagePreviewModal.style.display = 'none';
+    imagePreviewImg.src = '';
+    imagePreviewImg.alt = '';
+    selectedImageProductId = null;
+}
+
+function openImageUpload(productId) {
+    selectedImageProductId = productId;
+    productImageInput.value = '';
+    productImageInput.click();
+}
+
+async function handleProductImageSelected(e) {
+    const file = e.target.files[0];
+    if (!file || !selectedImageProductId) return;
+
+    if (!file.type.startsWith('image/')) {
+        showError('Please select an image file');
+        return;
+    }
+
+    try {
+        const result = await API.updateProductImage(selectedImageProductId, file);
+        const idx = products.findIndex(p => p.id === selectedImageProductId);
+        if (idx >= 0) products[idx] = result.data;
+
+        renderProducts();
+        if (imagePreviewModal.style.display !== 'none') {
+            openImagePreview(result.data);
+        }
+        showSuccess('Product image updated');
+    } catch (err) {
+        showError(err.message);
+    }
 }
 
 function startInlineEdit(cell) {

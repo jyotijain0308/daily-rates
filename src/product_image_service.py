@@ -8,7 +8,10 @@ from typing import Optional
 import requests
 from PIL import Image
 
-import config
+try:
+    import config
+except ImportError:
+    from src import config
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +24,12 @@ class ProductImageService:
     def __init__(self):
         self.assets_root = Path(__file__).resolve().parent
 
-    def get_product_image_path(self, product_name: str) -> Optional[str]:
+    def get_product_image_path(
+        self,
+        product_name: str,
+        country_of_origin: Optional[str] = None,
+        fetch_if_missing: bool = True,
+    ) -> Optional[str]:
         """Return a generator-compatible image path for a product."""
         slug = self.slugify(product_name)
         if not slug:
@@ -31,10 +39,13 @@ class ProductImageService:
         if local_path:
             return local_path
 
+        if not fetch_if_missing:
+            return None
+
         if not self._can_fetch():
             return None
 
-        return self._fetch_from_pexels(product_name, slug)
+        return self._fetch_from_pexels(product_name, slug, country_of_origin)
 
     @staticmethod
     def slugify(value: str) -> str:
@@ -70,13 +81,31 @@ class ProductImageService:
             and bool(getattr(config, "PEXELS_API_KEY", ""))
         )
 
-    def _fetch_from_pexels(self, product_name: str, slug: str) -> Optional[str]:
+    def _build_search_query(self, product_name: str, country_of_origin: Optional[str] = None) -> str:
+        """Build a search query specific enough for agro product imagery."""
+        query_parts = [product_name]
+        if country_of_origin:
+            query_parts.append(country_of_origin)
+
+        search_category = getattr(config, "PRODUCT_IMAGE_SEARCH_CATEGORY", "")
+        if search_category:
+            query_parts.append(search_category)
+
+        return " ".join(part.strip() for part in query_parts if part and part.strip())
+
+    def _fetch_from_pexels(
+        self,
+        product_name: str,
+        slug: str,
+        country_of_origin: Optional[str] = None,
+    ) -> Optional[str]:
+        search_query = self._build_search_query(product_name, country_of_origin)
         try:
             response = requests.get(
                 config.PEXELS_API_URL,
                 headers={"Authorization": config.PEXELS_API_KEY},
                 params={
-                    "query": product_name,
+                    "query": search_query,
                     "per_page": 1,
                     "orientation": "landscape",
                 },
@@ -85,17 +114,17 @@ class ProductImageService:
             response.raise_for_status()
             photos = response.json().get("photos", [])
             if not photos:
-                logger.info("No Pexels image found for product: %s", product_name)
+                logger.info("No Pexels image found for product query: %s", search_query)
                 return None
 
             image_url = self._select_image_url(photos[0])
             if not image_url:
-                logger.info("Pexels result did not contain an image URL for: %s", product_name)
+                logger.info("Pexels result did not contain an image URL for query: %s", search_query)
                 return None
 
             return self._download_image(image_url, slug)
         except Exception as exc:
-            logger.warning("Could not fetch Pexels image for %s: %s", product_name, exc)
+            logger.warning("Could not fetch Pexels image for query %s: %s", search_query, exc)
             return None
 
     def _select_image_url(self, photo: dict) -> Optional[str]:
@@ -118,10 +147,48 @@ class ProductImageService:
             output_path.parent.mkdir(parents=True, exist_ok=True)
 
             with Image.open(BytesIO(response.content)) as downloaded_image:
-                downloaded_image.convert("RGB").save(output_path, format="JPEG", quality=90)
+                self._save_sized_jpeg(downloaded_image, output_path)
 
             logger.info("Cached Pexels product image: %s", output_path)
             return relative_path
         except Exception as exc:
             logger.warning("Could not download Pexels image %s: %s", image_url, exc)
             return None
+
+    def _save_sized_jpeg(self, image: Image.Image, output_path: Path) -> None:
+        """Resize to configured bounds and save as a compressed JPEG."""
+        max_size = (
+            getattr(config, "PRODUCT_IMAGE_MAX_WIDTH", 1200),
+            getattr(config, "PRODUCT_IMAGE_MAX_HEIGHT", 800),
+        )
+        resized = image.convert("RGB")
+        resized.thumbnail(max_size, Image.Resampling.LANCZOS)
+        resized.save(
+            output_path,
+            format="JPEG",
+            quality=getattr(config, "PRODUCT_IMAGE_JPEG_QUALITY", 85),
+            optimize=True,
+        )
+
+    def save_product_image(self, product_name: str, image_stream) -> Optional[str]:
+        """Save a manually uploaded product image into the product image cache."""
+        slug = self.slugify(product_name)
+        if not slug:
+            return None
+
+        output_dir = self.assets_root / config.PRODUCT_IMAGES_DIR
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        for extension in self.IMAGE_EXTENSIONS:
+            cached_file = output_dir / f"{slug}.{extension}"
+            if cached_file.exists():
+                cached_file.unlink()
+
+        relative_path = f"{config.PRODUCT_IMAGES_DIR}/{slug}.jpg"
+        output_path = self.assets_root / relative_path
+
+        with Image.open(image_stream) as uploaded_image:
+            self._save_sized_jpeg(uploaded_image, output_path)
+
+        logger.info("Updated product image: %s", output_path)
+        return relative_path

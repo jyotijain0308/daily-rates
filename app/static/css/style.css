@@ -415,6 +415,11 @@ a:hover {
     gap: 1rem;
 }
 
+.single-field-grid {
+    max-width: 420px;
+    margin: 0 auto;
+}
+
 .form-group label {
     display: block;
     margin-bottom: 0.35rem;
@@ -437,6 +442,12 @@ a:hover {
 }
 
 /* Upload zone */
+.import-method-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+}
+
 .upload-zone {
     border: 2px dashed var(--border);
     border-radius: var(--radius);
@@ -453,9 +464,18 @@ a:hover {
 }
 
 .upload-icon {
-    font-size: 2.5rem;
-    display: block;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 3rem;
+    height: 2.25rem;
     margin-bottom: 0.5rem;
+    border-radius: 6px;
+    background: rgba(0, 102, 204, 0.08);
+    color: var(--primary);
+    font-size: 0.875rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
 }
 
 .selected-file {
@@ -464,6 +484,12 @@ a:hover {
     background: rgba(0, 102, 204, 0.08);
     border-radius: 6px;
     font-size: 0.875rem;
+}
+
+@media (max-width: 760px) {
+    .import-method-grid {
+        grid-template-columns: 1fr;
+    }
 }
 
 /* Tables */
@@ -498,6 +524,48 @@ a:hover {
     background: rgba(0, 102, 204, 0.03);
 }
 
+.data-table tbody tr.large-change-row {
+    background: #fef2f2;
+}
+
+.data-table tbody tr.large-change-row:hover {
+    background: #fee2e2;
+}
+
+.product-thumb-btn {
+    display: inline-flex;
+    padding: 0;
+    border: 0;
+    background: none;
+    cursor: pointer;
+}
+
+.product-thumb-btn:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+    border-radius: 6px;
+}
+
+.product-thumb {
+    display: inline-flex;
+    width: 64px;
+    height: 44px;
+    object-fit: cover;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg);
+    color: var(--text-muted);
+    font-size: 0.6875rem;
+    line-height: 1.1;
+    text-align: center;
+}
+
+.product-thumb-btn:hover .product-thumb {
+    border-color: var(--primary);
+}
+
 .data-table .editable {
     cursor: pointer;
     border-bottom: 1px dashed var(--primary);
@@ -522,6 +590,8 @@ a:hover {
     border-radius: 12px;
     font-size: 0.8125rem;
     font-weight: 600;
+    background: var(--border);
+    color: var(--text-muted);
 }
 
 .badge-success {
@@ -542,6 +612,8 @@ a:hover {
 .preview-badges {
     display: flex;
     gap: 0.5rem;
+    flex-wrap: wrap;
+    justify-content: flex-end;
 }
 
 /* Rate change colors */
@@ -553,6 +625,11 @@ a:hover {
 .rate-down {
     color: var(--error);
     font-weight: 600;
+}
+
+.rate-large {
+    color: var(--error);
+    font-weight: 700;
 }
 
 .rate-neutral {
@@ -602,6 +679,16 @@ a:hover {
 
 .generate-actions {
     justify-content: center;
+}
+
+.mp4-preview {
+    display: block;
+    width: 100%;
+    max-height: 70vh;
+    aspect-ratio: 16 / 9;
+    background: #0f172a;
+    border: 1px solid var(--border);
+    border-radius: 6px;
 }
 
 .progress-wrap {
@@ -676,6 +763,19 @@ a:hover {
     cursor: pointer;
     color: var(--text-muted);
     line-height: 1;
+}
+
+.image-preview-modal {
+    max-width: min(920px, calc(100vw - 2rem));
+}
+
+.image-preview-img {
+    display: block;
+    width: 100%;
+    max-height: 72vh;
+    object-fit: contain;
+    border-radius: 6px;
+    background: var(--bg);
 }
 
 /* Toast notifications */

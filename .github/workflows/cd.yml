@@ -122,17 +122,40 @@ jobs:
           IMAGE: ${{ needs.build-and-push.outputs.image }}:${{ github.sha }}
           GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
           GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+          POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          PDF_TABLE_EXTRACTION_PROVIDER: ${{ secrets.PDF_TABLE_EXTRACTION_PROVIDER }}
+          OPENAI_PDF_EXTRACTION_MODEL: ${{ secrets.OPENAI_PDF_EXTRACTION_MODEL }}
+          OLLAMA_BASE_URL: ${{ secrets.OLLAMA_BASE_URL }}
+          OLLAMA_PDF_EXTRACTION_MODEL: ${{ secrets.OLLAMA_PDF_EXTRACTION_MODEL }}
         run: |
+          set -euo pipefail
+
+          printf -v REMOTE_ENV \
+            "IMAGE=%q GHCR_USERNAME=%q GHCR_TOKEN=%q CONTAINER_NAME=%q APP_DIR=%q POSTGRES_DB=%q POSTGRES_USER=%q POSTGRES_PASSWORD=%q DATABASE_URL=%q OPENAI_API_KEY=%q PDF_TABLE_EXTRACTION_PROVIDER=%q OPENAI_PDF_EXTRACTION_MODEL=%q OLLAMA_BASE_URL=%q OLLAMA_PDF_EXTRACTION_MODEL=%q" \
+            "$IMAGE" \
+            "$GHCR_USERNAME" \
+            "$GHCR_TOKEN" \
+            "$CONTAINER_NAME" \
+            "$APP_DIR" \
+            "$POSTGRES_DB" \
+            "$POSTGRES_USER" \
+            "$POSTGRES_PASSWORD" \
+            "$DATABASE_URL" \
+            "$OPENAI_API_KEY" \
+            "$PDF_TABLE_EXTRACTION_PROVIDER" \
+            "$OPENAI_PDF_EXTRACTION_MODEL" \
+            "$OLLAMA_BASE_URL" \
+            "$OLLAMA_PDF_EXTRACTION_MODEL"
+
           ssh -i ~/.ssh/aws_ec2_key \
             -o BatchMode=yes \
             -o IdentitiesOnly=yes \
             "${SSH_USER}@${SSH_HOST}" \
-            "IMAGE='${IMAGE}' \
-             GHCR_USERNAME='${GHCR_USERNAME}' \
-             GHCR_TOKEN='${GHCR_TOKEN}' \
-             CONTAINER_NAME='${CONTAINER_NAME}' \
-             APP_DIR='${APP_DIR}' \
-             bash -s" <<'EOF'
+            "${REMOTE_ENV} bash -s" <<'EOF'
           set -euo pipefail
 
           if [ ! -d "$APP_DIR" ] || [ ! -w "$APP_DIR" ]; then
@@ -141,12 +164,64 @@ jobs:
           fi
 
           mkdir -p "$APP_DIR"/{instance,output,uploads,assets}
+          APP_NETWORK="${CONTAINER_NAME}-network"
+          POSTGRES_CONTAINER_NAME="${CONTAINER_NAME}-postgres"
+          POSTGRES_VOLUME_NAME="${CONTAINER_NAME}-postgres-data"
+
+          if [ -z "${DATABASE_URL:-}" ]; then
+            if [ -z "${POSTGRES_DB:-}" ] || [ -z "${POSTGRES_USER:-}" ] || [ -z "${POSTGRES_PASSWORD:-}" ]; then
+              echo "Missing database secrets. Set DATABASE_URL, or set POSTGRES_DB, POSTGRES_USER, and POSTGRES_PASSWORD."
+              exit 1
+            fi
+            DATABASE_URL="$(python3 - <<'PY'
+          import os
+          from urllib.parse import quote
+
+          user = quote(os.environ["POSTGRES_USER"], safe="")
+          password = quote(os.environ["POSTGRES_PASSWORD"], safe="")
+          database = quote(os.environ["POSTGRES_DB"], safe="")
+          host = os.environ["POSTGRES_CONTAINER_NAME"]
+          print(f"postgresql+psycopg://{user}:{password}@{host}:5432/{database}")
+          PY
+          )"
+          fi
 
           if [ -n "${GHCR_USERNAME:-}" ] && [ -n "${GHCR_TOKEN:-}" ]; then
             echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
           fi
 
           docker pull "$IMAGE"
+          docker network create "$APP_NETWORK" 2>/dev/null || true
+
+          if [ -n "${POSTGRES_DB:-}" ] && [ -n "${POSTGRES_USER:-}" ] && [ -n "${POSTGRES_PASSWORD:-}" ]; then
+            docker volume create "$POSTGRES_VOLUME_NAME" >/dev/null
+
+            if docker ps -a --format '{{.Names}}' | grep -Fxq "$POSTGRES_CONTAINER_NAME"; then
+              docker start "$POSTGRES_CONTAINER_NAME" >/dev/null
+            else
+              docker run -d \
+                --name "$POSTGRES_CONTAINER_NAME" \
+                --restart unless-stopped \
+                --network "$APP_NETWORK" \
+                -e POSTGRES_DB="$POSTGRES_DB" \
+                -e POSTGRES_USER="$POSTGRES_USER" \
+                -e POSTGRES_PASSWORD="$POSTGRES_PASSWORD" \
+                -v "$POSTGRES_VOLUME_NAME:/var/lib/postgresql/data" \
+                postgres:16-alpine
+            fi
+
+            for attempt in $(seq 1 30); do
+              if docker exec "$POSTGRES_CONTAINER_NAME" pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB" >/dev/null 2>&1; then
+                break
+              fi
+              if [ "$attempt" -eq 30 ]; then
+                echo "PostgreSQL did not become ready in time."
+                docker logs "$POSTGRES_CONTAINER_NAME" || true
+                exit 1
+              fi
+              sleep 2
+            done
+          fi
 
           # Seed the persistent assets volume from the image on first deploy only.
           if [ -z "$(find "$APP_DIR/assets" -mindepth 1 -maxdepth 1 2>/dev/null)" ]; then
@@ -165,8 +240,16 @@ jobs:
           docker run -d \
             --name "$CONTAINER_NAME" \
             --restart unless-stopped \
+            --network "$APP_NETWORK" \
+            --add-host host.docker.internal:host-gateway \
             -p 80:8000 \
             -e PORT=8000 \
+            -e DATABASE_URL="$DATABASE_URL" \
+            -e OPENAI_API_KEY="${OPENAI_API_KEY:-}" \
+            -e PDF_TABLE_EXTRACTION_PROVIDER="${PDF_TABLE_EXTRACTION_PROVIDER:-ollama}" \
+            -e OPENAI_PDF_EXTRACTION_MODEL="${OPENAI_PDF_EXTRACTION_MODEL:-gpt-4o-mini}" \
+            -e OLLAMA_BASE_URL="${OLLAMA_BASE_URL:-http://host.docker.internal:11434}" \
+            -e OLLAMA_PDF_EXTRACTION_MODEL="${OLLAMA_PDF_EXTRACTION_MODEL:-llama3.2-vision}" \
             -v "$APP_DIR/instance:/app/instance" \
             -v "$APP_DIR/output:/app/output" \
             -v "$APP_DIR/uploads:/app/uploads" \

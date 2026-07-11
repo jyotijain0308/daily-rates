@@ -16,6 +16,11 @@ def import_page():
     return render_template('import.html', active_page='import')
 
 
+@page_bp.route('/import-pdf')
+def import_pdf_page():
+    return render_template('import_pdf.html', active_page='import_pdf')
+
+
 @page_bp.route('/products')
 def products_page():
     return render_template('products.html', active_page='products')

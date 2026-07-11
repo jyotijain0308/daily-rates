@@ -4,15 +4,17 @@ A Python-based system that automatically generates professional PowerPoint prese
 
 ## Features
 
-**Professional PPT Generation**
+**Professional MP4 Generation**
 - Title slide with company name, heading, and current date
-- Individual product slides with rate information
+- Individual product frames with rate information
 - Thank you slide with currency exchange rates
 - Customizable colors, fonts, and branding
 
 **Product Management**
 - Web UI for importing, editing, and managing product rates
-- SQLite database backend with REST API
+- Export all products as a CSV sheet for bulk rate updates
+- PostgreSQL database backend with REST API in production
+- Product rate history for import and manual price changes
 - Load product data from CSV or JSON files (CLI mode)
 - Display current rates and previous rates
 - Show rate changes in percentage
@@ -20,9 +22,11 @@ A Python-based system that automatically generates professional PowerPoint prese
 
 **Web Interface**
 - Dashboard with stats and generation history
-- CSV import with preview and validation
+- CSV import with diff preview, large-change highlighting, confirmation, and validation
+- Image table import with OCR preview and validation
 - Inline product editing
-- One-click PPT generation and download
+- One-click MP4 generation, preview, and download
+- In-browser MP4 preview before download
 - Responsive design for desktop and mobile
 
 **Exchange Rate Integration**
@@ -64,13 +68,23 @@ PyCharmMiscProject/
 ├── Procfile                   # Production deployment config
 ├── tests/                     # Integration tests
 ├── requirements.txt           # Python dependencies
-└── ppt_products.db            # SQLite database (created on first run)
+└── ppt_products.db            # Local SQLite fallback when DATABASE_URL is not set
 ```
 
 ## Prerequisites
 
 - Python 3.8+
 - pip (Python package manager)
+- Tesseract OCR binary for image table import
+
+Install Tesseract before using image import:
+
+```bash
+brew install tesseract        # macOS
+# sudo apt-get install tesseract-ocr  # Ubuntu/Debian
+```
+
+The Docker image installs `tesseract-ocr` automatically for deployed image imports.
 
 ---
 
@@ -108,7 +122,20 @@ python db.py init    # Create tables
 python db.py drop    # Drop all tables (use with caution)
 ```
 
-The SQLite database file `ppt_products.db` is created automatically in the project root on first run.
+By default, local development uses a SQLite fallback file at `ppt_products.db`. For persistent deployments, set `DATABASE_URL` to PostgreSQL.
+
+Database migrations are managed with Flask-Migrate/Alembic:
+
+```bash
+export FLASK_APP=wsgi:create_app
+flask db upgrade
+```
+
+For an existing database that was created before migrations were added, run the same upgrade command. The initial migration skips tables that already exist and creates missing tables such as `product_rate_history`. If you have already applied the schema manually, mark the database as current:
+
+```bash
+flask db stamp head
+```
 
 ### Step 4: Start the Web Server
 
@@ -128,17 +155,19 @@ To stop the server, press `Ctrl+C` in the terminal.
 |------|-----|-------------|
 | Dashboard | [http://localhost:5001/](http://localhost:5001/) | Overview, stats, quick actions |
 | Import | [http://localhost:5001/import](http://localhost:5001/import) | Upload CSV, preview, save |
-| Products | [http://localhost:5001/products](http://localhost:5001/products) | View and edit product rates |
-| Generate | [http://localhost:5001/generate](http://localhost:5001/generate) | Create and download PPT or MP4 |
+| Products | [http://localhost:5001/products](http://localhost:5001/products) | View, edit, and export product rates |
+| Generate | [http://localhost:5001/generate](http://localhost:5001/generate) | Create, preview, and download MP4 videos |
 
 ### Web Workflow
 
-1. **Import** — Upload a CSV file, review the preview, then save to the database
-2. **Manage** — Edit rates inline (double-click a cell) or use the Add/Edit modal
-3. **Generate** — Select a country and output format, then click Generate
-4. **Download** — Download the generated country-specific PPT or MP4 file from the Generate page or Dashboard history
+1. **Import** — Upload a CSV file or table image, review created/updated/skipped counts and old-vs-new rate differences, then confirm the save
+2. **Manage** — Edit rates inline (double-click a cell), use the Add/Edit modal, or export the full rate sheet from Products
+3. **Generate** — Select a country and shipment method, then click Generate MP4
+4. **Preview/Download** — Preview the generated MP4 in the browser, then download the country-specific video from the Generate page or Dashboard history
 
-Generated files are saved to `output/`, for example `output/india_products_price_list_20260627_154030.pptx` or `output/india_products_price_list_20260627_154030.mp4`.
+To update rates in bulk, open **Products**, click **Export Rate Sheet**, update the `Price in AED` values in the downloaded CSV, then upload that CSV on the **Import** page. Existing products are updated by `Product Name` + `Country of origin`. The import preview highlights rate changes of 20% or more before you confirm.
+
+Generated web files are saved to `output/`, for example `output/india_products_price_list_20260627_154030.mp4`.
 
 On app startup, generated `.pptx` and `.mp4` files from previous days are automatically deleted from `output/` and `src/output/`. Files generated today are kept.
 
@@ -151,13 +180,66 @@ python -m unittest tests.test_api -v
 
 ### Production Deployment
 
-Run from the project root:
+Set a PostgreSQL database URL before starting the app:
+
+```bash
+export DATABASE_URL="postgresql+psycopg://user:password@host:5432/ppt_daily_rates"
+```
+
+Then run from the project root:
 
 ```bash
 gunicorn "wsgi:create_app()" --bind 0.0.0.0:8000 --workers 2
 ```
 
 Or use the included `Procfile` with Heroku or similar platforms.
+
+For Docker Compose deployments, the included `docker-compose.yml` starts PostgreSQL with a persistent `postgres_data` volume and passes `DATABASE_URL` to the Flask app. Create a real `.env` file from the committed example and keep `.env` only on the server:
+
+```bash
+cp .env.example .env
+# edit .env and replace the password with a strong secret
+docker compose up -d --build
+```
+
+By default this exposes the app at [http://localhost:8000](http://localhost:8000). Set `APP_PORT=80` in `.env` for a server that should listen on port 80.
+
+Do not commit `.env`; it is already ignored by git.
+
+For GitHub Actions EC2 deployment, set these repository secrets:
+
+- `EC2_HOST` or `AWS_HOST`
+- `EC2_USER` or `AWS_USER`
+- `EC2_SSH_KEY` or `AWS_SSH_KEY`
+- `POSTGRES_DB`
+- `POSTGRES_USER`
+- `POSTGRES_PASSWORD`
+- `OPENAI_API_KEY` only if using OpenAI for PDF table extraction
+
+Alternatively, set `DATABASE_URL` if you use an external managed PostgreSQL database. If `DATABASE_URL` is not set, the EC2 workflow creates or reuses a local PostgreSQL Docker container with a persistent Docker volume.
+
+Free local AI PDF import uses Ollama by default:
+
+```bash
+brew install ollama
+ollama pull llama3.2-vision
+ollama serve
+```
+
+Then set:
+
+- `PDF_TABLE_EXTRACTION_PROVIDER=ollama`
+- `OLLAMA_BASE_URL=http://localhost:11434` for local Python
+- `OLLAMA_BASE_URL=http://host.docker.internal:11434` for Docker Compose
+- `OLLAMA_PDF_EXTRACTION_MODEL=llama3.2-vision`
+
+Optional OpenAI PDF import settings:
+
+- `PDF_TABLE_EXTRACTION_PROVIDER=openai`
+- `OPENAI_API_KEY=...`
+- `OPENAI_PDF_EXTRACTION_MODEL=gpt-4o-mini`
+
+If the selected AI provider fails or returns no rows, PDF import falls back to text-table extraction and OCR.
 
 ---
 
