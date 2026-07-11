@@ -167,21 +167,23 @@ jobs:
           APP_NETWORK="${CONTAINER_NAME}-network"
           POSTGRES_CONTAINER_NAME="${CONTAINER_NAME}-postgres"
           POSTGRES_VOLUME_NAME="${CONTAINER_NAME}-postgres-data"
-          export POSTGRES_CONTAINER_NAME
 
           if [ -z "${DATABASE_URL:-}" ]; then
             if [ -z "${POSTGRES_DB:-}" ] || [ -z "${POSTGRES_USER:-}" ] || [ -z "${POSTGRES_PASSWORD:-}" ]; then
               echo "Missing database secrets. Set DATABASE_URL, or set POSTGRES_DB, POSTGRES_USER, and POSTGRES_PASSWORD."
               exit 1
             fi
-            DATABASE_URL="$(python3 - <<'PY'
+            DATABASE_URL="$(POSTGRES_CONTAINER_NAME="$POSTGRES_CONTAINER_NAME" python3 - <<'PY'
           import os
+          import sys
           from urllib.parse import quote
 
           user = quote(os.environ["POSTGRES_USER"], safe="")
           password = quote(os.environ["POSTGRES_PASSWORD"], safe="")
           database = quote(os.environ["POSTGRES_DB"], safe="")
-          host = os.environ["POSTGRES_CONTAINER_NAME"]
+          host = os.environ.get("POSTGRES_CONTAINER_NAME")
+          if not host:
+              sys.exit("POSTGRES_CONTAINER_NAME was not provided to DATABASE_URL builder")
           print(f"postgresql+psycopg://{user}:{password}@{host}:5432/{database}")
           PY
           )"
@@ -210,6 +212,7 @@ jobs:
                 -v "$POSTGRES_VOLUME_NAME:/var/lib/postgresql/data" \
                 postgres:16-alpine
             fi
+            docker network connect "$APP_NETWORK" "$POSTGRES_CONTAINER_NAME" 2>/dev/null || true
 
             for attempt in $(seq 1 30); do
               if docker exec "$POSTGRES_CONTAINER_NAME" pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB" >/dev/null 2>&1; then
@@ -222,6 +225,23 @@ jobs:
               fi
               sleep 2
             done
+
+            POSTGRES_USER_IDENT="$(POSTGRES_USER="$POSTGRES_USER" python3 - <<'PY'
+          import os
+          user = os.environ["POSTGRES_USER"]
+          print('"' + user.replace('"', '""') + '"')
+          PY
+          )"
+
+            POSTGRES_PASSWORD_LITERAL="$(POSTGRES_PASSWORD="$POSTGRES_PASSWORD" python3 - <<'PY'
+          import os
+          password = os.environ["POSTGRES_PASSWORD"]
+          print("'" + password.replace("'", "''") + "'")
+          PY
+          )"
+
+            printf 'ALTER USER %s WITH PASSWORD %s;\n' "$POSTGRES_USER_IDENT" "$POSTGRES_PASSWORD_LITERAL" | \
+              docker exec -i "$POSTGRES_CONTAINER_NAME" psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"
           fi
 
           # Seed the persistent assets volume from the image on first deploy only.
@@ -259,12 +279,34 @@ jobs:
 
           docker image prune -f
 
-          docker exec "$CONTAINER_NAME" python - <<'PY'
+          for attempt in $(seq 1 30); do
+            if ! docker ps -a --format '{{.Names}}' | grep -Fxq "$CONTAINER_NAME"; then
+              echo "Application container was not created."
+              exit 1
+            fi
+
+            if [ "$(docker inspect -f '{{.State.Running}}' "$CONTAINER_NAME")" = "true" ]; then
+              if docker exec "$CONTAINER_NAME" python - <<'PY'
           import json
           import urllib.request
 
-          with urllib.request.urlopen("http://127.0.0.1:8000/health", timeout=10) as response:
+          with urllib.request.urlopen("http://127.0.0.1:8000/health", timeout=5) as response:
               payload = json.loads(response.read().decode("utf-8"))
               assert payload["status"] == "healthy", payload
           PY
+              then
+                exit 0
+              fi
+            else
+              echo "Application container exited before becoming healthy."
+              docker logs "$CONTAINER_NAME" || true
+              exit 1
+            fi
+
+            sleep 2
+          done
+
+          echo "Application container did not become healthy in time."
+          docker logs "$CONTAINER_NAME" || true
+          exit 1
           EOF
