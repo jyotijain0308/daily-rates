@@ -1,34 +1,32 @@
 services:
-  postgres:
-    image: postgres:16-alpine
-    container_name: flask-postgres
-    restart: always
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in .env}
-      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
   flask-app:
     build: .
     container_name: flask-app
     restart: always
-    depends_on:
-      postgres:
-        condition: service_healthy
     environment:
       DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in .env}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       PDF_TABLE_EXTRACTION_PROVIDER: ${PDF_TABLE_EXTRACTION_PROVIDER:-ollama}
       OPENAI_PDF_EXTRACTION_MODEL: ${OPENAI_PDF_EXTRACTION_MODEL:-gpt-4o-mini}
-      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      OLLAMA_BASE_URL: ${DOCKER_OLLAMA_BASE_URL:-http://host.docker.internal:11434}
       OLLAMA_PDF_EXTRACTION_MODEL: ${OLLAMA_PDF_EXTRACTION_MODEL:-llama3.2-vision}
+      HASHTAG_OLLAMA_MODEL: ${HASHTAG_OLLAMA_MODEL:-llama3.2}
+      YOUTUBE_CLIENT_ID: ${YOUTUBE_CLIENT_ID:-}
+      YOUTUBE_CLIENT_SECRET: ${YOUTUBE_CLIENT_SECRET:-}
+      YOUTUBE_REDIRECT_URI: ${YOUTUBE_REDIRECT_URI:-http://localhost:8000/api/social/youtube/callback}
+      FACEBOOK_APP_ID: ${FACEBOOK_APP_ID:-}
+      FACEBOOK_APP_SECRET: ${FACEBOOK_APP_SECRET:-}
+      FACEBOOK_REDIRECT_URI: ${FACEBOOK_REDIRECT_URI:-http://localhost:8000/api/social/facebook/callback}
+      FACEBOOK_GRAPH_VERSION: ${FACEBOOK_GRAPH_VERSION:-v23.0}
+      FACEBOOK_LOGIN_CONFIG_ID: ${FACEBOOK_LOGIN_CONFIG_ID:-}
+      FACEBOOK_SCOPES: ${FACEBOOK_SCOPES:-pages_show_list,pages_read_engagement,pages_manage_posts,business_management,instagram_basic,instagram_content_publish}
+      SOCIAL_PUBLIC_BASE_URL: ${SOCIAL_PUBLIC_BASE_URL:-}
+      LINKEDIN_CLIENT_ID: ${LINKEDIN_CLIENT_ID:-}
+      LINKEDIN_CLIENT_SECRET: ${LINKEDIN_CLIENT_SECRET:-}
+      LINKEDIN_REDIRECT_URI: ${LINKEDIN_REDIRECT_URI:-http://localhost:8000/api/social/linkedin/callback}
+      LINKEDIN_PERSONAL_SCOPES: ${LINKEDIN_PERSONAL_SCOPES:-openid profile w_member_social}
+      LINKEDIN_PAGE_SCOPES: ${LINKEDIN_PAGE_SCOPES:-openid profile rw_organization_admin w_organization_social}
+      LINKEDIN_PROMPT: ${LINKEDIN_PROMPT:-login}
       PRODUCT_IMAGE_AUTO_FETCH: ${PRODUCT_IMAGE_AUTO_FETCH:-true}
       PRODUCT_IMAGE_PREFETCH_ON_GENERATE: ${PRODUCT_IMAGE_PREFETCH_ON_GENERATE:-true}
       PRODUCT_IMAGE_PREFETCH_LIMIT: ${PRODUCT_IMAGE_PREFETCH_LIMIT:-20}
@@ -37,6 +35,3 @@ services:
       - "host.docker.internal:host-gateway"
     ports:
       - "${APP_PORT:-8000}:8000"
-
-volumes:
-  postgres_data:

@@ -1,6 +1,8 @@
-# PPT Daily Rates System
+# Taaza Rates
 
-A Python-based system that automatically generates professional PowerPoint presentations with daily product rates, exchange rates, and company branding.
+Daily market rates, ready to share.
+
+A Python-based system that imports product rates, manages company-specific product data, and generates branded MP4 rate videos with preview, download, and social publishing workflows.
 
 ## Features
 
@@ -15,13 +17,14 @@ A Python-based system that automatically generates professional PowerPoint prese
 - Export all products as a CSV sheet for bulk rate updates
 - PostgreSQL database backend with REST API in production
 - Product rate history for import and manual price changes
+- Products missing images dashboard workflow with direct link to filtered products
 - Load product data from CSV or JSON files (CLI mode)
 - Display current rates and previous rates
 - Show rate changes in percentage
 - Support for multiple product categories
 
 **Web Interface**
-- Dashboard with stats and generation history
+- Dashboard with stats, missing-image tracking, updated-product tracking, active generation jobs, social connections, and today's generation summary
 - CSV import with diff preview, large-change highlighting, confirmation, and validation
 - Image table import with OCR preview and validation
 - Inline product editing
@@ -29,6 +32,16 @@ A Python-based system that automatically generates professional PowerPoint prese
 - In-browser MP4 preview before download
 - Background MP4 generation with cancellation support
 - Responsive design for desktop and mobile
+
+**Authentication and Company Scope**
+- Sign in and sign up functionality
+- Users belong to an existing registered company
+- Products, countries, generation history, audio, and social connections are scoped by company
+
+**Social Publishing**
+- Connected social platform status on the dashboard
+- Publishing integrations for YouTube, Facebook Page, Instagram Reels, LinkedIn, and X
+- Manual social options were removed; publishing flows use configured integrations
 
 **Exchange Rate Integration**
 - Fetch live exchange rates to INR from free APIs
@@ -44,33 +57,32 @@ A Python-based system that automatically generates professional PowerPoint prese
 
 ## Project Structure
 
-```
-PyCharmMiscProject/
+```text
+DailyRates/
 ├── app/
+│   ├── models.py              # SQLAlchemy database models
 │   ├── routes/                # Flask API and page routes
+│   ├── services/              # Business logic and external integrations
+│   │   ├── importing/         # CSV, image OCR, and PDF product import logic
+│   │   ├── generation/        # PPT/MP4 generation, jobs, cleanup, rates, config
+│   │   └── social/            # Social platform integrations
 │   ├── templates/             # Web UI HTML pages
 │   └── static/                # CSS and JavaScript
-├── src/
-│   ├── config.py              # Configuration & styling
-│   ├── product_data.py        # Product data loading & validation
-│   ├── exchange_rates.py      # Exchange rate fetching & caching
-│   ├── ppt_generator.py       # PPT slide generation
-│   ├── error_handling.py      # Error handling & validation
-│   ├── main.py                # CLI orchestration workflow
-│   └── data/                  # CLI input data (when run from src/)
 ├── data/                      # Sample data at project root
-├── output/                    # Generated PPT/MP4 files (web mode)
-├── models.py                  # SQLAlchemy database models
+├── uploads/
+│   ├── assets/                # Uploaded product, company, and country images
+│   ├── generated/             # Generated MP4/PPT files
+│   └── jobs/                  # Generation job state
 ├── db.py                      # Database init and seed utilities
-├── csv_importer.py            # CSV validation and bulk import
-├── ppt_service.py             # PPT generation service (web)
 ├── wsgi.py                    # Flask application factory
-├── run.py                     # Web server entry point
+├── run.py                     # Optional direct Python web server entry point
 ├── Procfile                   # Production deployment config
 ├── tests/                     # Integration tests
 ├── requirements.txt           # Python dependencies
-└── ppt_products.db            # Local SQLite fallback when DATABASE_URL is not set
+└── docker-compose.yml         # Web app and PostgreSQL services
 ```
+
+Root-level files are now limited to app entry points, deployment/configuration files, database utilities, and documentation. Business logic lives under `app/services/`; database models live under `app/models.py`.
 
 ## Prerequisites
 
@@ -93,22 +105,70 @@ The Docker image installs `tesseract-ocr` automatically for deployed image impor
 
 The web frontend is served by Flask — there is **no separate npm/React build step**. Start the server from the **project root** and open your browser.
 
-### Step 1: Create Virtual Environment
+### Step 1: Create Environment File
 
 ```bash
-cd PyCharmMiscProject
-python3 -m venv venv_web
-source venv_web/bin/activate        # macOS/Linux
-# venv_web\Scripts\activate         # Windows
+cp .env.example .env
+# edit .env and replace POSTGRES_PASSWORD with a strong secret
 ```
 
-### Step 2: Install Dependencies
+### Step 2: Start Native PostgreSQL
+
+PostgreSQL runs outside Docker. Start your local PostgreSQL service before starting the app, then create the configured user/database if they do not already exist.
 
 ```bash
+brew services start postgresql@17
+createuser daily_rates_user
+createdb -O daily_rates_user ef_daily_rates
+```
+
+If you use a different native PostgreSQL version or a managed PostgreSQL server, update `DATABASE_URL` and `HOST_DATABASE_URL` in `.env`.
+
+### Step 3: Start Docker Compose
+
+```bash
+docker compose up -d --build
+```
+
+This starts the Flask app only. Open in your browser: [http://localhost:8000](http://localhost:8000)
+
+Load sample products into the native PostgreSQL database if needed:
+
+```bash
+docker compose exec flask-app python db.py seed
+```
+
+To stop the stack:
+
+```bash
+docker compose down
+```
+
+### Optional: Run Python Commands Directly
+
+The web app uses PostgreSQL. It does not fall back to SQLite when run outside Docker. For the Flask app container, use `host.docker.internal` so it can reach native PostgreSQL on your Mac:
+
+```bash
+DATABASE_URL=postgresql+psycopg://ppt_user:your-password@host.docker.internal:5432/ppt_daily_rates
+```
+
+For Python commands on your host machine, use `127.0.0.1`:
+
+```bash
+HOST_DATABASE_URL=postgresql+psycopg://ppt_user:your-password@127.0.0.1:5432/ppt_daily_rates
+```
+
+Use single quotes around manually typed URLs if your password contains shell-special characters.
+
+Install dependencies for direct Python commands:
+
+```bash
+python3 -m venv venv_web
+source venv_web/bin/activate
 pip install -r requirements.txt
 ```
 
-### Step 3: Initialize Database (Optional)
+Initialize or seed the configured PostgreSQL database:
 
 Load sample products for testing:
 
@@ -123,8 +183,6 @@ python db.py init    # Create tables
 python db.py drop    # Drop all tables (use with caution)
 ```
 
-By default, local development uses a SQLite fallback file at `ppt_products.db`. For persistent deployments, set `DATABASE_URL` to PostgreSQL.
-
 Database migrations are managed with Flask-Migrate/Alembic:
 
 ```bash
@@ -138,7 +196,7 @@ For an existing database that was created before migrations were added, run the 
 flask db stamp head
 ```
 
-### Step 4: Start the Web Server
+Start the direct Python development server only after `DATABASE_URL` is set:
 
 ```bash
 python run.py
@@ -152,25 +210,39 @@ To stop the server, press `Ctrl+C` in the terminal.
 
 ### Web UI Pages
 
+The URLs below use the Docker Compose default `APP_PORT=8000`. If you run `python run.py` directly, use the port printed by the server, usually `5001` unless that port is busy.
+
 | Page | URL | Description |
 |------|-----|-------------|
-| Dashboard | [http://localhost:5001/](http://localhost:5001/) | Overview, stats, quick actions |
-| Import | [http://localhost:5001/import](http://localhost:5001/import) | Upload CSV, preview, save |
-| Products | [http://localhost:5001/products](http://localhost:5001/products) | View, edit, and export product rates |
-| Generate | [http://localhost:5001/generate](http://localhost:5001/generate) | Create, preview, and download MP4 videos |
+| Dashboard | [http://localhost:8000/](http://localhost:8000/) | Overview, stats, missing images, updated products, social connections, today's generations, and active jobs |
+| Import | [http://localhost:8000/import](http://localhost:8000/import) | Upload CSV, preview, save |
+| Products | [http://localhost:8000/products](http://localhost:8000/products) | View, edit, export product rates, and update product images |
+| Generate | [http://localhost:8000/generate](http://localhost:8000/generate) | Create, preview, and download MP4 videos |
+| Company | [http://localhost:8000/company](http://localhost:8000/company) | Manage company settings, branding assets, defaults, and social connections |
 
 ### Web Workflow
 
 1. **Import** — Upload a CSV file or table image, review created/updated/skipped counts and old-vs-new rate differences, then confirm the save
 2. **Manage** — Edit rates inline (double-click a cell), use the Add/Edit modal, or export the full rate sheet from Products
 3. **Generate** — Select a country and shipment method, then click Generate MP4. You can cancel an in-progress generation from the same page.
-4. **Preview/Download** — Preview the generated MP4 in the browser, then download the country-specific video from the Generate page or Dashboard history
+4. **Preview/Download/Share** — Preview the generated MP4 in the browser, then download or publish it from the Generate page
+5. **Track** — Use the Dashboard to monitor today's total/success/failed generations, active jobs, missing product images, updated products, large rate changes, and connected social platforms
 
 To update rates in bulk, open **Products**, click **Export Rate Sheet**, update the `Price in AED` values in the downloaded CSV, then upload that CSV on the **Import** page. Existing products are updated by `Product Name` + `Country of origin`. The import preview highlights rate changes of 20% or more before you confirm.
 
-Generated web files are saved to `output/`, for example `output/india_products_price_list_20260627_154030.mp4`.
+Generated web files are saved to `uploads/generated/`, for example `uploads/generated/videos/india_products_price_list_20260627_154030.mp4`.
 
-On app startup, generated `.pptx` and `.mp4` files from previous days are automatically deleted from `output/` and `src/output/`. Files generated today are kept.
+On app startup, generated `.pptx` and `.mp4` files from previous days are automatically deleted from `uploads/generated/`. Files generated today are kept.
+
+### Dashboard Layout
+
+- Top stats show products, origin countries, total generations, latest MP4, and last import.
+- Quick Actions provide direct access to import, products, generate, and latest download.
+- Products Missing Images and Products Updated Today appear in one row.
+- Products Updated Today includes tabs for updated products and 20%+ large rate changes.
+- Social Media Connections appears as a compact auto-width list of configured publishing platforms.
+- Today Generations shows total, success, and failed counts in the card header and includes failure reasons when available.
+- Pending/Running Jobs appears at the bottom and only shows active jobs updated today.
 
 ### Run Tests
 
@@ -195,7 +267,7 @@ gunicorn "wsgi:create_app()" --bind 0.0.0.0:8000 --workers 2
 
 Or use the included `Procfile` with Heroku or similar platforms.
 
-For Docker Compose deployments, the included `docker-compose.yml` starts PostgreSQL with a persistent `postgres_data` volume and passes `DATABASE_URL` to the Flask app. Create a real `.env` file from the committed example and keep `.env` only on the server:
+For Docker Compose deployments, the included `docker-compose.yml` starts the Flask app and passes `DATABASE_URL` to it. PostgreSQL must already be reachable, either as native PostgreSQL on the host or as an external managed database. Create a real `.env` file from the committed example and keep `.env` only on the server:
 
 ```bash
 cp .env.example .env
@@ -246,12 +318,12 @@ If the selected AI provider fails or returns no rows, PDF import falls back to t
 
 ## CLI Mode (Alternative)
 
-For command-line PPT generation from CSV/JSON files without the web UI. **All CLI commands below must be run from the `src/` directory** because paths in `src/config.py` are relative to that folder.
+For command-line PPT generation from CSV/JSON files without the web UI. Run commands from the project root.
 
 ### Step 1: Create Virtual Environment
 
 ```bash
-cd PyCharmMiscProject
+cd DailyRates
 python3 -m venv venv_ppt
 source venv_ppt/bin/activate        # macOS/Linux
 # venv_ppt\Scripts\activate           # Windows
@@ -266,25 +338,24 @@ pip install -r requirements.txt
 ### Step 3: Run the System
 
 ```bash
-cd src
-python main.py
+python -m app.services.generation.main
 ```
 
-The generated PPT files will be saved to `src/output/`, one file per country of origin.
+The generated PPT files will be saved to `uploads/generated/presentations/`, one file per country of origin.
 
 ### Using Sample Data
 
 The CLI automatically creates sample data if no products file exists:
 
 ```bash
-cd src && python main.py
+python -m app.services.generation.main
 ```
 
 ### Using Your Own Data
 
 #### CSV Format
 
-Create `src/data/products.csv`:
+Create `data/products.csv`:
 
 ```csv
 S.No.,Country of origin,Shipment by,Product Name,Weight in kg,Packing,Price in AED
@@ -299,7 +370,7 @@ When importing, the app uses `Product Name` + `Country of origin` as the unique 
 
 #### JSON Format
 
-Create `src/data/products.json`:
+Create `data/products.json`:
 
 ```json
 [
@@ -318,14 +389,14 @@ Create `src/data/products.json`:
 Then run:
 
 ```bash
-cd src && python main.py
+python -m app.services.generation.main
 ```
 
 ---
 
 ## Configuration
 
-Edit `src/config.py` to customize:
+Edit `app/services/generation/config.py` to customize:
 
 - **Company Details:** Company name, address, website, default country, logo paths
 - **Styling:** Colors (primary, accent, background), fonts, font sizes
@@ -335,29 +406,45 @@ Edit `src/config.py` to customize:
 ### Example: Change Company Name
 
 ```python
-# In src/config.py
+# In app/services/generation/config.py
 COMPANY_NAME = "Your Company Ltd."
 COMPANY_ADDRESS = "Dubai, United Arab Emirates"
 COMPANY_WEBSITE = "https://www.example.com"
-COMPANY_LOGO_IMAGE = "assets/company_logo.png"
-UAE_LOGO_IMAGE = "assets/uae_logo.jpg"
+COMPANY_LOGO_IMAGE = "uploads/assets/company/company_logo.png"
+UAE_LOGO_IMAGE = "uploads/assets/company/uae_logo.jpg"
 ```
 
-Country logo paths are configured in `COUNTRY_LOGO_IMAGES`. If a configured image file is missing, the PPT uses a text placeholder instead of failing.
+Country logo paths are configured in `COUNTRY_LOGO_IMAGES`. If a configured image file is missing, the generator uses a text placeholder instead of failing.
 
-Product images are read from `PRODUCT_IMAGES_DIR`, which defaults to `assets/products`. Add product images under `src/assets/products/` using the product-name slug:
+Uploaded and fetched product images are stored under `uploads/assets/products/`. Use the product-name slug:
 
 ```text
-src/assets/products/wheat_flour.png
-src/assets/products/jasmine_rice.jpg
+uploads/assets/products/wheat_flour.png
+uploads/assets/products/jasmine_rice.jpg
 ```
 
 The slug is the lower-case product name with spaces/symbols replaced by underscores.
 
+Asset resolution supports both current and legacy path formats:
+
+```text
+uploads/assets/company/company_logo.png
+uploads/assets/countries/default/india.jpg
+uploads/assets/products/wheat_flour.jpg
+assets/company/company_logo.png
+assets/countries/default/india.jpg
+assets/products/wheat_flour.jpg
+company_logo.png
+india.jpg
+wheat_flour.jpg
+```
+
+All generated MP4/PPT rendering resolves assets through `uploads/assets/`, so moving to S3 later can be handled behind the storage/asset layer.
+
 ### Example: Customize Colors
 
 ```python
-# In src/config.py
+# In app/services/generation/config.py
 COLORS = {
     "primary": RGBColor(0, 102, 204),
     "accent": RGBColor(255, 153, 0),
@@ -369,7 +456,7 @@ COLORS = {
 
 ---
 
-## Generated PPT/MP4 Structure
+## Generated MP4/PPT Structure
 
 ### Slide 1: Title Slide
 - Company logo on top, displayed at native size
@@ -382,7 +469,7 @@ Each product gets its own slide showing:
 - Company logo on the top-left
 - Country image on the top-right
 - Title: `{Product Name} {Weight}kg {Packing}`
-- Product image from `src/assets/products/`
+- Product image from `uploads/assets/products/`
 - Dark price band: `Price: AED {price}`
 
 ### Last Slide: Thank You Slide
@@ -414,8 +501,8 @@ Each product gets its own slide showing:
 
 | Mode | Log output |
 |------|------------|
-| Web UI | Terminal where `python run.py` is running |
-| CLI | Console and `src/ppt_generator.log` |
+| Web UI | `docker compose logs -f flask-app` |
+| CLI | Console and `ppt_generator.log` |
 
 Example CLI log output:
 
@@ -423,7 +510,7 @@ Example CLI log output:
 2026-06-26 22:22:40,059 - __main__ - INFO - Starting PPT generation workflow...
 2026-06-26 22:22:40,059 - product_data - INFO - Loaded 6 products from data/products.csv
 2026-06-26 22:22:41,353 - exchange_rates - INFO - Fetched exchange rates from API
-2026-06-26 22:22:45,076 - ppt_generator - INFO - Presentation saved to output/daily_rates.pptx
+2026-06-26 22:22:45,076 - ppt_generator - INFO - Presentation saved to uploads/generated/presentations/daily_rates.pptx
 ```
 
 ---
@@ -433,23 +520,23 @@ Example CLI log output:
 ### Add Country Currency or Logo
 
 ```python
-# In src/config.py
+# In app/services/generation/config.py
 COUNTRY_CURRENCY_CODES["India"] = "INR"
-COUNTRY_LOGO_IMAGES["India"] = "assets/countries/india.jpg"
+COUNTRY_LOGO_IMAGES["India"] = "uploads/assets/countries/default/india.jpg"
 ```
 
 ### Change Output File Location
 
 ```python
-# In src/config.py
-OUTPUT_PPT_FILE = "output/daily_rates.pptx"   # CLI (relative to src/)
+# In app/services/generation/config.py
+OUTPUT_PPT_FILE = "uploads/generated/presentations/daily_rates.pptx"
 ```
 
-Web mode output is controlled in `ppt_service.py` and saved to the project root `output/` folder, one file per country.
+Web mode output is controlled in `app/services/ppt_service.py` and saved under `uploads/generated/videos/`, one file per country.
 
 ### Modify Slide Styling
 
-Edit `PPTGenerator` class methods in `src/ppt_generator.py`:
+Edit `PPTGenerator` class methods in `app/services/generation/ppt_generator.py`:
 - `add_title_slide()` — Customize title slide layout
 - `add_product_slide()` — Customize product slide template
 - `add_thank_you_slide()` — Customize thank you slide
@@ -494,10 +581,10 @@ This is also configured in `Procfile`.
 ## Troubleshooting
 
 ### Web UI: Page won't load
-**Solution:** Run `python run.py` from the **project root** (not from `src/`), then visit [http://localhost:5001](http://localhost:5001). Check the terminal for the exact URL and any errors.
+**Solution:** Run `docker compose up -d --build` from the **project root**, then visit [http://localhost:8000](http://localhost:8000). Check logs with `docker compose logs -f flask-app`.
 
 ### Web UI: "Address already in use" / port conflict
-**Solution:** On macOS, port 5000 is often taken by AirPlay Receiver. The app now defaults to port **5001**. Run `python run.py` again, or choose a port explicitly: `PORT=8000 python run.py`. To free port 5000, disable AirPlay Receiver in **System Settings → General → AirDrop & Handoff → AirPlay Receiver**.
+**Solution:** Docker Compose exposes the app on `APP_PORT`, defaulting to **8000**. Set another value in `.env`, for example `APP_PORT=8080`, then run `docker compose up -d`.
 
 ### Web UI: Generate button disabled
 **Solution:** Import or add at least one product, then select a country on the Generate page.
@@ -506,13 +593,13 @@ This is also configured in `Procfile`.
 **Solution:** Ensure the CSV has required columns (`S.No.`, `Country of origin`, `Shipment by`, `Product Name`, `Weight in kg`, `Packing`, `Price in AED`) and is UTF-8 encoded. Use "Download Template" on the Import page.
 
 ### CLI: "File not found" errors
-**Solution:** Run commands from the `src/` directory. Ensure `src/data/` and `src/output/` exist, or let the system create them automatically.
+**Solution:** Run CLI commands from the project root. Ensure `data/` and `uploads/` exist, or let the system create them automatically.
 
 ### Issue: Exchange rates not fetching
 **Solution:** Check your internet connection. Rates will be retried on the next run.
 
 ### Issue: PPT file is corrupted
-**Solution:** Delete the file in `output/` and regenerate. For CLI mode, check `src/ppt_generator.log` for errors.
+**Solution:** Delete the file in `uploads/generated/presentations/` and regenerate. For CLI mode, check `ppt_generator.log` for errors.
 
 ### Issue: Memory usage is high with many products
 **Solution:** The system generates one slide per product. Current design is efficient for up to 100+ products.
@@ -549,11 +636,11 @@ This project is provided as-is for your use.
 
 For issues or questions:
 
-1. **Web UI:** Check the terminal where `python run.py` is running
-2. **CLI:** Check `src/ppt_generator.log`
+1. **Web UI:** Check `docker compose logs -f flask-app`
+2. **CLI:** Check `ppt_generator.log`
 3. Review error messages in the console or browser toast notifications
 4. Verify data format matches the expected CSV/JSON structure
-5. Test with sample data: `python db.py seed` (web) or `cd src && python main.py` (CLI)
+5. Test with sample data after setting `DATABASE_URL`: `python db.py seed` (web) or `python -m app.services.generation.main` (CLI)
 6. Run tests: `python -m unittest tests.test_api -v`
 
 ---

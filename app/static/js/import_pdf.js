@@ -98,7 +98,7 @@ function showPdfPreview(preview) {
             <td>${escapeHtml(row.product_name)}</td>
             <td>${escapeHtml(row.country_of_origin)}</td>
             <td>${escapeHtml(row.shipment_by)}</td>
-            <td>${Number(row.weight_kg).toLocaleString('en-IN', { maximumFractionDigits: 2 })}</td>
+            <td>${escapeHtml(row.weight_kg)}</td>
             <td>${escapeHtml(row.packing)}</td>
             <td>AED ${formatRate(row.price_aed)}</td>
         `;

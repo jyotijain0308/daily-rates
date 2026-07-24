@@ -1,20 +1,21 @@
 {% extends "base.html" %}
 
-{% block title %}Dashboard — PPT Daily Rates{% endblock %}
+{% block title %}Dashboard — Taaza Rates{% endblock %}
 
 {% block content %}
 <section class="page-header">
     <div>
         <h1>Dashboard</h1>
-        <p class="subtitle">Overview of your product rates and presentation status</p>
+        <p class="subtitle">Overview of your product rates and video generation status</p>
     </div>
 </section>
 
 <div class="stats-grid" id="statsGrid">
     <div class="stat-card loading-card"><div class="stat-value">—</div><div class="stat-label">Products</div></div>
-    <div class="stat-card loading-card"><div class="stat-value">—</div><div class="stat-label">Categories</div></div>
-    <div class="stat-card loading-card"><div class="stat-value">—</div><div class="stat-label">Generations</div></div>
-    <div class="stat-card loading-card"><div class="stat-value">—</div><div class="stat-label">Latest PPT</div></div>
+    <div class="stat-card loading-card"><div class="stat-value">—</div><div class="stat-label">Origin Countries</div></div>
+    <div class="stat-card loading-card"><div class="stat-value">—</div><div class="stat-label">Total Generations</div></div>
+    <div class="stat-card loading-card"><div class="stat-value">—</div><div class="stat-label">Latest MP4</div></div>
+    <div class="stat-card loading-card"><div class="stat-value">—</div><div class="stat-label">Last Import</div></div>
 </div>
 
 <section class="card">
@@ -32,25 +33,56 @@
         </a>
         <a href="/generate" class="action-card" id="generateAction">
             <span class="action-icon">🎯</span>
-            <h3>Generate PPT</h3>
-            <p id="generateActionHint">Create your presentation</p>
+            <h3>Generate MP4</h3>
+            <p id="generateActionHint">Create your video</p>
         </a>
         <a href="#" class="action-card" id="downloadAction" style="display:none;">
             <span class="action-icon">⬇️</span>
-            <h3>Download PPT</h3>
-            <p id="downloadActionHint">Get the latest file</p>
+            <h3>Download MP4</h3>
+            <p id="downloadActionHint">Get the latest video</p>
         </a>
     </div>
 </section>
 
-<section class="card">
-    <div class="card-header-row">
-        <h2>Recent Generations</h2>
+<section class="dashboard-work-grid">
+    <div class="card dashboard-alert-card" id="socialConnectionsCard">
+        <div class="card-header-row">
+            <div>
+                <h2>Social Media Connections</h2>
+                <p class="subtitle">Loading connected publishing channels...</p>
+            </div>
+        </div>
     </div>
-    <div id="historyTableWrap">
-        <p class="empty-state">Loading history...</p>
+
+    <div class="card dashboard-alert-card" id="updatedProductsCard">
+        <div class="card-header-row">
+            <div>
+                <h2>Products Updated Today</h2>
+                <p class="subtitle">Loading products updated from rate history...</p>
+            </div>
+        </div>
     </div>
 </section>
+
+<section class="card dashboard-alert-card" id="todayGenerationsCard">
+    <div class="card-header-row">
+        <div>
+            <h2>Today Generations</h2>
+            <p class="subtitle">Loading today's generation history...</p>
+        </div>
+    </div>
+</section>
+
+<section class="card dashboard-alert-card" id="activeJobsCard">
+    <div class="card-header-row">
+        <div>
+            <h2>Pending/Running Jobs</h2>
+            <p class="subtitle">Loading active MP4 generation jobs...</p>
+        </div>
+    </div>
+</section>
+
+{% include "partials/share_modal.html" %}
 {% endblock %}
 
 {% block scripts %}

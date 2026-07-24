@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block title %}Sign Up — Taaza Rates{% endblock %}
+
+{% block content %}
+<section class="auth-shell">
+    <div class="auth-card">
+        <h1>Sign Up</h1>
+        <p class="subtitle">Create a user account for an existing registered company.</p>
+        {% if error %}
+            <div class="alert alert-error">{{ error }}</div>
+        {% endif %}
+        <form method="post" class="auth-form">
+            <div class="form-group">
+                <label for="full_name">Full name</label>
+                <input type="text" id="full_name" name="full_name" class="input" value="{{ values.full_name }}" required autocomplete="name">
+            </div>
+            <div class="form-group">
+                <label for="email">Email</label>
+                <input type="email" id="email" name="email" class="input" value="{{ values.email }}" required autocomplete="email">
+            </div>
+            <div class="form-group">
+                <label for="company_identifier">Registered company</label>
+                <input type="text" id="company_identifier" name="company_identifier" class="input" value="{{ values.company_identifier }}" required placeholder="Company ID, slug, or exact name">
+            </div>
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" class="input" required minlength="8" autocomplete="new-password">
+            </div>
+            <button type="submit" class="btn btn-primary btn-lg">Create Account</button>
+        </form>
+        <p class="auth-switch">Already have an account? <a href="{{ url_for('auth.signin') }}">Sign in</a></p>
+    </div>
+</section>
+{% endblock %}

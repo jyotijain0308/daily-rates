@@ -25,7 +25,7 @@ echo "Activating virtual environment..."
 source venv_ppt/bin/activate
 
 echo "Installing dependencies..."
-pip install -q python-pptx requests python-dateutil pandas
+pip install -q -r requirements.txt
 
 echo "✓ Setup complete!"
 echo ""
@@ -35,18 +35,16 @@ echo "Running PPT Generation"
 echo "================================================"
 echo ""
 
-cd src || exit 1
-
 echo "Generating PPT with sample data..."
-python main.py
+python -m app.services.generation.main
 
 echo ""
 echo "================================================"
-echo "✓ Done! Check output/daily_rates.pptx"
+echo "✓ Done! Check uploads/generated/presentations/daily_rates.pptx"
 echo "================================================"
 echo ""
 echo "Next steps:"
 echo "1. Edit data/products.csv with your product data"
-echo "2. Customize config.py with your company details"
-echo "3. Run: python main.py"
+echo "2. Customize app/services/generation/config.py with your company details"
+echo "3. Run: python -m app.services.generation.main"
 echo ""

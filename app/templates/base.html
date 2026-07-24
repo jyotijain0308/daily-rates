@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}PPT Daily Rates{% endblock %}</title>
+    <title>{% block title %}Taaza Rates{% endblock %}</title>
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/favicon.png') }}">
     <link rel="shortcut icon" type="image/png" href="{{ url_for('static', filename='images/favicon.png') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
@@ -15,22 +15,34 @@
             <div class="topbar-inner">
                 <a href="/" class="brand">
                     <span class="brand-icon">
-                        <img src="../static/images/favicon.png" alt="PPT Daily Rates" width="80px" style="margin-top: 7px" />
+                        <img src="../static/images/favicon.png" alt="Taaza Rates" width="80px" style="margin-top: 7px" />
                     </span>
-                    <span class="brand-text">Daily Rates</span>
+                    <span class="brand-copy">
+                        <span class="brand-text">Taaza Rates</span>
+                        <span class="brand-tagline">Daily market rates, ready to share</span>
+                    </span>
                 </a>
-                <button class="nav-toggle" id="navToggle" aria-label="Toggle navigation">☰</button>
-                <nav class="main-nav" id="mainNav">
-                    <a href="/" class="nav-link {% if active_page == 'dashboard' %}active{% endif %}">Dashboard</a>
-                    <a href="/import" class="nav-link {% if active_page == 'import' %}active{% endif %}">Import</a>
-                    <a href="/import-pdf" class="nav-link {% if active_page == 'import_pdf' %}active{% endif %}">PDF Import</a>
-                    <a href="/products" class="nav-link {% if active_page == 'products' %}active{% endif %}">Products</a>
-                    <a href="/countries" class="nav-link {% if active_page == 'countries' %}active{% endif %}">Countries</a>
-                    <a href="/generate" class="nav-link {% if active_page == 'generate' %}active{% endif %}">Generate</a>
-                </nav>
+                {% if current_user %}
+                    <button class="nav-toggle" id="navToggle" aria-label="Toggle navigation">☰</button>
+                    <nav class="main-nav" id="mainNav">
+                        <a href="/" class="nav-link {% if active_page == 'dashboard' %}active{% endif %}">Dashboard</a>
+                        <a href="/import" class="nav-link {% if active_page == 'import' %}active{% endif %}">Import</a>
+                        {# PDF import is intentionally disabled.
+                        <a href="/import-pdf" class="nav-link {% if active_page == 'import_pdf' %}active{% endif %}">PDF Import</a>
+                        #}
+                        <a href="/products" class="nav-link {% if active_page == 'products' %}active{% endif %}">Products</a>
+                        <a href="/countries" class="nav-link {% if active_page == 'countries' %}active{% endif %}">Countries</a>
+                        <a href="/company" class="nav-link {% if active_page == 'company' %}active{% endif %}">Company</a>
+                        <a href="/generate" class="nav-link {% if active_page == 'generate' %}active{% endif %}">Generate</a>
+                        <form method="post" action="{{ url_for('auth.signout') }}" class="signout-form">
+                            <button type="submit" class="nav-link nav-button">Sign Out</button>
+                        </form>
+                    </nav>
+                {% endif %}
             </div>
         </header>
 
+        {% if current_user %}
         <div class="workflow-bar">
             <div class="workflow-steps">
                 <a href="/import" class="workflow-step {% if active_page in ['import', 'import_pdf'] %}current{% elif active_page in ['products', 'generate', 'dashboard'] %}done{% endif %}">
@@ -50,13 +62,14 @@
                 </span>
             </div>
         </div>
+        {% endif %}
 
         <main class="main-content">
             {% block content %}{% endblock %}
         </main>
 
         <footer class="footer">
-            <p>PPT Daily Rates System &mdash; Professional rate presentations</p>
+            <p>Taaza Rates &mdash; Daily market rates, ready to share</p>
         </footer>
     </div>
 

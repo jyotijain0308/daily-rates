@@ -17,7 +17,10 @@ const API = {
 
         if (!response.ok) {
             const message = data?.message || `Request failed (${response.status})`;
-            throw new Error(message);
+            const error = new Error(message);
+            error.status = response.status;
+            error.data = data;
+            throw error;
         }
 
         return data;
@@ -37,6 +40,26 @@ const API = {
 
     getManagedCountries() {
         return this.request('/api/countries/');
+    },
+
+    getCurrentCompany() {
+        return this.request('/api/companies/current');
+    },
+
+    updateCompanySettings(id, payload) {
+        return this.request(`/api/companies/${id}/settings`, {
+            method: 'PUT',
+            body: JSON.stringify(payload),
+        });
+    },
+
+    uploadCompanyAsset(id, field, file) {
+        const formData = new FormData();
+        formData.append('file', file);
+        return this.request(`/api/companies/${id}/assets/${encodeURIComponent(field)}`, {
+            method: 'POST',
+            body: formData,
+        });
     },
 
     createCountry(country) {
@@ -122,23 +145,24 @@ const API = {
         });
     },
 
-    previewImageImport(file) {
-        const formData = new FormData();
-        formData.append('file', file);
-        return this.request('/api/import/preview-image', {
-            method: 'POST',
-            body: formData,
-        });
-    },
-
-    previewPdfImport(file) {
-        const formData = new FormData();
-        formData.append('file', file);
-        return this.request('/api/import/preview-pdf', {
-            method: 'POST',
-            body: formData,
-        });
-    },
+    // PDF and image imports are intentionally disabled. CSV import remains active.
+    // previewImageImport(file) {
+    //     const formData = new FormData();
+    //     formData.append('file', file);
+    //     return this.request('/api/import/preview-image', {
+    //         method: 'POST',
+    //         body: formData,
+    //     });
+    // },
+    //
+    // previewPdfImport(file) {
+    //     const formData = new FormData();
+    //     formData.append('file', file);
+    //     return this.request('/api/import/preview-pdf', {
+    //         method: 'POST',
+    //         body: formData,
+    //     });
+    // },
 
     saveImport(content) {
         return this.request('/api/import/save', {
@@ -192,6 +216,154 @@ const API = {
 
     getGenerationHistory() {
         return this.request('/api/generation/history');
+    },
+
+    getGenerationShareMetadata(filename) {
+        return this.request(`/api/generation/share-metadata/${encodeURIComponent(filename)}`);
+    },
+
+    getYouTubeStatus() {
+        return this.request('/api/social/youtube/status');
+    },
+
+    getYouTubeConnectUrl() {
+        return this.request('/api/social/youtube/connect-url');
+    },
+
+    disconnectYouTube() {
+        return this.request('/api/social/youtube/disconnect', {
+            method: 'POST',
+        });
+    },
+
+    publishYouTube(payload) {
+        return this.request('/api/social/youtube/publish', {
+            method: 'POST',
+            body: JSON.stringify(payload),
+        });
+    },
+
+    getFacebookStatus() {
+        return this.request('/api/social/facebook/status');
+    },
+
+    getFacebookConnectUrl() {
+        return this.request('/api/social/facebook/connect-url');
+    },
+
+    disconnectFacebook() {
+        return this.request('/api/social/facebook/disconnect', {
+            method: 'POST',
+        });
+    },
+
+    publishFacebook(payload) {
+        return this.request('/api/social/facebook/publish', {
+            method: 'POST',
+            body: JSON.stringify(payload),
+        });
+    },
+
+    getInstagramStatus() {
+        return this.request('/api/social/instagram/status');
+    },
+
+    publishInstagram(payload) {
+        return this.request('/api/social/instagram/publish', {
+            method: 'POST',
+            body: JSON.stringify(payload),
+        });
+    },
+
+    getXStatus() {
+        return this.request('/api/social/x/status');
+    },
+
+    getXConnectUrl() {
+        return this.request('/api/social/x/connect-url');
+    },
+
+    disconnectX() {
+        return this.request('/api/social/x/disconnect', {
+            method: 'POST',
+        });
+    },
+
+    publishX(payload) {
+        return this.request('/api/social/x/publish', {
+            method: 'POST',
+            body: JSON.stringify(payload),
+        });
+    },
+
+    getLinkedInStatus() {
+        return this.request('/api/social/linkedin/status');
+    },
+
+    getLinkedInPersonalStatus() {
+        return this.request('/api/social/linkedin/personal/status');
+    },
+
+    getLinkedInPageStatus() {
+        return this.request('/api/social/linkedin/page/status');
+    },
+
+    getLinkedInConnectUrl() {
+        return this.request('/api/social/linkedin/connect-url');
+    },
+
+    getLinkedInPersonalConnectUrl() {
+        return this.request('/api/social/linkedin/personal/connect-url');
+    },
+
+    getLinkedInPageConnectUrl() {
+        return this.request('/api/social/linkedin/page/connect-url');
+    },
+
+    disconnectLinkedIn() {
+        return this.request('/api/social/linkedin/disconnect', {
+            method: 'POST',
+        });
+    },
+
+    disconnectLinkedInPersonal() {
+        return this.request('/api/social/linkedin/personal/disconnect', {
+            method: 'POST',
+        });
+    },
+
+    disconnectLinkedInPage() {
+        return this.request('/api/social/linkedin/page/disconnect', {
+            method: 'POST',
+        });
+    },
+
+    publishLinkedIn(payload) {
+        return this.request('/api/social/linkedin/publish', {
+            method: 'POST',
+            body: JSON.stringify(payload),
+        });
+    },
+
+    publishLinkedInPersonal(payload) {
+        return this.request('/api/social/linkedin/personal/publish', {
+            method: 'POST',
+            body: JSON.stringify(payload),
+        });
+    },
+
+    publishLinkedInPage(payload) {
+        return this.request('/api/social/linkedin/page/publish', {
+            method: 'POST',
+            body: JSON.stringify(payload),
+        });
+    },
+
+    generateSocialHashtags(payload) {
+        return this.request('/api/social/hashtags', {
+            method: 'POST',
+            body: JSON.stringify(payload),
+        });
     },
 
     getLatestPpt() {

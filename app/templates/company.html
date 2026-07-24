@@ -1,0 +1,201 @@
+{% extends "base.html" %}
+
+{% block title %}Company — Taaza Rates{% endblock %}
+
+{% block content %}
+<section class="page-header">
+    <div>
+        <h1>Company</h1>
+        <p class="subtitle">Manage branding, currency, and generation defaults</p>
+    </div>
+</section>
+
+<form id="companyForm">
+    <section class="card">
+        <div class="card-header-row">
+            <h2>Company Details</h2>
+            <span class="status-pill status-inactive" id="companyStatus">Loading</span>
+        </div>
+        <div class="form-grid company-details-grid">
+            <div class="form-group">
+                <label for="companyName">Company name *</label>
+                <input type="text" id="companyName" class="input" required>
+            </div>
+            <div class="form-group">
+                <label for="companySubtitle">Subtitle *</label>
+                <input type="text" id="companySubtitle" class="input" required>
+            </div>
+            <div class="form-group">
+                <label for="defaultCountry">Default country *</label>
+                <input type="text" id="defaultCountry" class="input" required>
+            </div>
+            <div class="form-group">
+                <label for="companyWebsite">Website</label>
+                <input type="url" id="companyWebsite" class="input">
+            </div>
+            <div class="form-group form-group-wide">
+                <label for="companyAddress">Address *</label>
+                <textarea id="companyAddress" class="input textarea" rows="3" required></textarea>
+            </div>
+        </div>
+    </section>
+
+    <section class="card">
+        <h2>Branding Assets</h2>
+        <div class="form-grid company-assets-grid">
+            <div class="form-group company-asset-field">
+                <label>Company logo</label>
+                <div class="company-asset-preview">
+                    <img id="companyLogoPreviewImg" class="company-asset-img" src="" alt="Company logo preview" style="display:none;">
+                    <span id="companyLogoPreviewEmpty" class="company-asset-empty">No image</span>
+                </div>
+                <input type="hidden" id="companyLogoImage">
+                <input type="file" id="companyLogoInput" accept="image/*" hidden>
+                <div class="file-picker-row">
+                    <button type="button" class="btn btn-secondary" id="browseCompanyLogoBtn">Browse Logo</button>
+                    <span class="text-muted" id="companyLogoFileName">No file selected</span>
+                </div>
+            </div>
+            <div class="form-group company-asset-field">
+                <label>Destination logo</label>
+                <div class="company-asset-preview">
+                    <img id="destinationLogoPreviewImg" class="company-asset-img" src="" alt="Destination logo preview" style="display:none;">
+                    <span id="destinationLogoPreviewEmpty" class="company-asset-empty">No image</span>
+                </div>
+                <input type="hidden" id="destinationLogoImage">
+                <input type="file" id="destinationLogoInput" accept="image/*" hidden>
+                <div class="file-picker-row">
+                    <button type="button" class="btn btn-secondary" id="browseDestinationLogoBtn">Browse Logo</button>
+                    <span class="text-muted" id="destinationLogoFileName">No file selected</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="card">
+        <h2>Pricing & Exchange Rates</h2>
+        <div class="form-grid">
+            <div class="form-group">
+                <label for="companyCurrency">Base currency *</label>
+                <input type="text" id="companyCurrency" class="input" maxlength="10" required>
+            </div>
+            <div class="form-group">
+                <label for="rateDisplayFormat">Rate display format *</label>
+                <input type="text" id="rateDisplayFormat" class="input" required>
+            </div>
+            <div class="form-group">
+                <label for="importPriceDeductionPercent">Import price deduction % *</label>
+                <input type="number" id="importPriceDeductionPercent" class="input" min="0" max="100" step="0.01" required>
+            </div>
+        </div>
+    </section>
+
+    <section class="card">
+        <h2>Social Post Defaults</h2>
+        <div class="form-grid">
+            <div class="form-group form-group-wide">
+                <label for="socialPostDescription">Default post description</label>
+                <textarea id="socialPostDescription" class="input textarea social-description-textarea" rows="10"></textarea>
+                <p class="text-muted">Used as the starting Description in the Share MP4 modal. Generated hashtags are added below it.</p>
+            </div>
+        </div>
+    </section>
+
+    <section class="card">
+        <div class="card-header-row">
+            <h2>Social Connections</h2>
+        </div>
+        <div class="social-connection-grid">
+            <div class="social-connection-row">
+                <span class="social-platform-mark social-youtube">YT</span>
+                <div class="social-connection-copy">
+                    <div class="social-connection-title">
+                        <strong>YouTube</strong>
+                        <span class="status-pill status-inactive" id="youtubeStatus">YouTube not connected</span>
+                    </div>
+                    <p class="text-muted" id="youtubeConnectionMessage">Connect a company YouTube channel to publish generated MP4 videos.</p>
+                </div>
+                <div class="file-action-row">
+                    <button type="button" class="btn btn-secondary btn-compact" id="connectYouTubeBtn">Connect YouTube</button>
+                    <button type="button" class="btn btn-secondary btn-compact" id="disconnectYouTubeBtn" style="display:none;">Disconnect</button>
+                </div>
+            </div>
+            <div class="social-connection-row">
+                <span class="social-platform-mark social-facebook">f</span>
+                <div class="social-connection-copy">
+                    <div class="social-connection-title">
+                        <strong>Facebook</strong>
+                        <span class="status-pill status-inactive" id="facebookStatus">Facebook not connected</span>
+                    </div>
+                    <p class="text-muted" id="facebookConnectionMessage">Connect a Facebook Page to publish generated MP4 videos. Personal Facebook sharing stays manual.</p>
+                </div>
+                <div class="file-action-row">
+                    <button type="button" class="btn btn-secondary btn-compact" id="connectFacebookBtn">Connect Facebook</button>
+                    <button type="button" class="btn btn-secondary btn-compact" id="disconnectFacebookBtn" style="display:none;">Disconnect</button>
+                </div>
+            </div>
+            <div class="social-connection-row">
+                <span class="social-platform-mark social-instagram">IG</span>
+                <div class="social-connection-copy">
+                    <div class="social-connection-title">
+                        <strong>Instagram</strong>
+                        <span class="status-pill status-inactive" id="instagramStatus">Instagram not connected</span>
+                    </div>
+                    <p class="text-muted" id="instagramConnectionMessage">Instagram publishing uses the Instagram account linked to the connected Facebook Page.</p>
+                </div>
+            </div>
+            <div class="social-connection-row">
+                <span class="social-platform-mark social-x">X</span>
+                <div class="social-connection-copy">
+                    <div class="social-connection-title">
+                        <strong>X</strong>
+                        <span class="status-pill status-inactive" id="xStatus">X not connected</span>
+                    </div>
+                    <p class="text-muted" id="xConnectionMessage">Connect X to publish generated MP4 videos as Posts.</p>
+                </div>
+                <div class="file-action-row">
+                    <button type="button" class="btn btn-secondary btn-compact" id="connectXBtn">Connect X</button>
+                    <button type="button" class="btn btn-secondary btn-compact" id="disconnectXBtn" style="display:none;">Disconnect</button>
+                </div>
+            </div>
+            <div class="social-connection-row">
+                <span class="social-platform-mark social-linkedin">in</span>
+                <div class="social-connection-copy">
+                    <div class="social-connection-title">
+                        <strong>LinkedIn Profile</strong>
+                        <span class="status-pill status-inactive" id="linkedinPersonalStatus">LinkedIn profile not connected</span>
+                    </div>
+                    <p class="text-muted" id="linkedinPersonalConnectionMessage">Connect a LinkedIn profile to publish generated MP4 videos personally.</p>
+                </div>
+                <div class="file-action-row">
+                    <button type="button" class="btn btn-secondary btn-compact" id="connectLinkedInPersonalBtn">Connect Personal Profile</button>
+                    <button type="button" class="btn btn-secondary btn-compact" id="disconnectLinkedInPersonalBtn" style="display:none;">Disconnect</button>
+                </div>
+            </div>
+            <div class="social-connection-row">
+                <span class="social-platform-mark social-linkedin">in</span>
+                <div class="social-connection-copy">
+                    <div class="social-connection-title">
+                        <strong>LinkedIn Page</strong>
+                        <span class="status-pill status-inactive" id="linkedinPageStatus">LinkedIn Page not connected</span>
+                    </div>
+                    <p class="text-muted" id="linkedinPageConnectionMessage">Connect with a LinkedIn admin account to publish generated MP4 videos to a Page.</p>
+                </div>
+                <div class="file-action-row">
+                    <button type="button" class="btn btn-secondary btn-compact" id="connectLinkedInPageBtn">Connect Company Page</button>
+                    <button type="button" class="btn btn-secondary btn-compact" id="disconnectLinkedInPageBtn" style="display:none;">Disconnect</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <div class="form-actions sticky-actions">
+        <button type="button" class="btn btn-secondary" id="reloadCompanyBtn">Reload</button>
+        <button type="submit" class="btn btn-primary" id="saveCompanyBtn">Save Company</button>
+    </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/company.js') }}"></script>
+{% endblock %}

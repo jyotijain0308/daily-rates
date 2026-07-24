@@ -18,6 +18,7 @@ let selectedImageProductId = null;
 let pexelsSearchPage = 1;
 let currentPexelsCandidates = [];
 let lastPexelsDescription = '';
+let showMissingImagesOnly = new URLSearchParams(window.location.search).get('missing_images') === '1';
 
 document.getElementById('addProductBtn').addEventListener('click', () => openModal());
 document.getElementById('closeModalBtn').addEventListener('click', closeModal);
@@ -62,6 +63,9 @@ async function loadProducts() {
     try {
         const result = await API.getProducts(1, 200);
         products = result.data;
+        if (showMissingImagesOnly) {
+            productSearch.value = '';
+        }
         productCount.textContent = `${result.pagination.total} product${result.pagination.total !== 1 ? 's' : ''}`;
         renderProducts();
     } catch (err) {
@@ -72,14 +76,32 @@ async function loadProducts() {
 
 function renderProducts() {
     const query = productSearch.value.toLowerCase().trim();
-    const filtered = products.filter(p =>
-        p.product_name.toLowerCase().includes(query) ||
-        p.country_of_origin.toLowerCase().includes(query) ||
-        p.shipment_by.toLowerCase().includes(query)
-    );
+    const filtered = products.filter(p => {
+        if (showMissingImagesOnly && p.has_image) {
+            return false;
+        }
+        return (
+            p.product_name.toLowerCase().includes(query) ||
+            p.country_of_origin.toLowerCase().includes(query) ||
+            p.shipment_by.toLowerCase().includes(query)
+        );
+    });
+
+    if (showMissingImagesOnly) {
+        productCount.innerHTML = `
+            ${filtered.length} product${filtered.length !== 1 ? 's' : ''} without images
+            <a href="/products" class="inline-link">Clear filter</a>
+        `;
+    } else {
+        productCount.textContent = `${filtered.length} product${filtered.length !== 1 ? 's' : ''}`;
+    }
 
     if (filtered.length === 0) {
-        productsBody.innerHTML = '<tr><td colspan="9" class="empty-state">No products found. Import CSV or add a product.</td></tr>';
+        productsBody.innerHTML = `<tr><td colspan="9" class="empty-state">${
+            showMissingImagesOnly
+                ? 'No products without images found.'
+                : 'No products found. Import CSV or add a product.'
+        }</td></tr>`;
         return;
     }
 
@@ -94,7 +116,7 @@ function renderProducts() {
                 <td class="editable" data-field="product_name">${escapeHtml(p.product_name)}</td>
                 <td class="editable" data-field="country_of_origin">${escapeHtml(p.country_of_origin)}</td>
                 <td class="editable" data-field="shipment_by">${escapeHtml(p.shipment_by)}</td>
-                <td class="editable" data-field="weight_kg">${Number(p.weight_kg).toLocaleString('en-IN', { maximumFractionDigits: 2 })}</td>
+                <td class="editable" data-field="weight_kg">${escapeHtml(p.weight_kg)}</td>
                 <td class="editable" data-field="packing">${escapeHtml(p.packing)}</td>
                 <td class="editable" data-field="price_aed">AED ${formatRate(p.price_aed)}</td>
                 <td class="text-muted">${formatDate(p.updated_at)}</td>
@@ -297,8 +319,8 @@ function startInlineEdit(cell) {
     const input = document.createElement('input');
     input.className = 'inline-input';
     input.value = currentValue;
-    input.type = ['serial_no', 'weight_kg', 'price_aed'].includes(field) ? 'number' : 'text';
-    if (field === 'weight_kg' || field === 'price_aed') input.step = '0.01';
+    input.type = ['serial_no', 'price_aed'].includes(field) ? 'number' : 'text';
+    if (field === 'price_aed') input.step = '0.01';
     if (field === 'serial_no') input.step = '1';
 
     cell.textContent = '';
@@ -309,7 +331,7 @@ function startInlineEdit(cell) {
     const save = async () => {
         const newValue = input.value.trim();
         const payload = {
-            [field]: ['weight_kg', 'price_aed'].includes(field)
+            [field]: field === 'price_aed'
                 ? parseFloat(newValue)
                 : field === 'serial_no'
                     ? (newValue ? parseInt(newValue, 10) : null)
@@ -363,7 +385,7 @@ async function handleFormSubmit(e) {
         country_of_origin: document.getElementById('productCountryOfOrigin').value.trim(),
         shipment_by: document.getElementById('productShipmentBy').value.trim(),
         product_name: document.getElementById('productName').value.trim(),
-        weight_kg: parseFloat(document.getElementById('productWeightKg').value),
+        weight_kg: document.getElementById('productWeightKg').value.trim(),
         packing: document.getElementById('productPacking').value.trim(),
         price_aed: parseFloat(document.getElementById('productPriceAed').value),
     };

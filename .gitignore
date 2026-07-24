@@ -5,14 +5,10 @@ __pycache__/
 .venv/
 venv_ppt/
 venv_web/
-uploads/
-output/*.pptx
-output/*.mp4
-src/output/*.pptx
-src/output/*.mp4
+uploads/audio/
+uploads/generated/
+uploads/jobs/
 instance/
 .env
 *.log
 .DS_Store
-src/.DS_Store
-src/assets/.DS_Store

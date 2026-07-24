@@ -3,11 +3,12 @@ import logging
 import re
 from pathlib import Path
 
-from flask import Blueprint, current_app, jsonify, request, send_from_directory, url_for
+from flask import Blueprint, current_app, jsonify, request, send_file, url_for
 from PIL import Image, UnidentifiedImageError
 
-from country_service import ensure_country
-from models import Country, Product
+from app.services.company_service import current_company, current_company_id
+from app.services.country_service import ensure_country, resolve_country_logo_asset
+from app.models import Country, Product
 from wsgi import db
 
 logger = logging.getLogger(__name__)
@@ -17,11 +18,15 @@ COUNTRY_FLAG_JPEG_QUALITY = 86
 
 
 def _country_by_id(country_id):
-    return Country.query.get_or_404(country_id)
+    return Country.query.filter_by(id=country_id, company_id=current_company_id()).first_or_404()
 
 
 def _country_assets_dir():
-    return Path(current_app.config.get('COUNTRY_ASSETS_DIR', 'src/assets/countries'))
+    return Path(current_app.config.get('COUNTRY_ASSETS_DIR', 'uploads/assets/countries'))
+
+
+def _project_root():
+    return Path(current_app.root_path)
 
 
 def _slugify(value):
@@ -31,16 +36,13 @@ def _slugify(value):
 def country_to_dict(country):
     """Serialize a country with a browser-loadable logo URL."""
     data = country.to_dict()
-    if country.logo_image:
-        image_file = _country_assets_dir() / Path(country.logo_image).name
-        if image_file.exists():
-            url_args = {
-                'filename': Path(country.logo_image).name,
-                'v': int(image_file.stat().st_mtime),
-            }
-            data['logo_url'] = url_for('countries.get_country_logo', **url_args)
-        else:
-            data['logo_url'] = None
+    logo_image, image_file = resolve_country_logo_asset(country, assets_dir=_country_assets_dir())
+    if logo_image and image_file:
+        data['logo_url'] = url_for(
+            'countries.get_country_logo',
+            filename=logo_image,
+            v=int(image_file.stat().st_mtime),
+        )
     else:
         data['logo_url'] = None
     return data
@@ -49,13 +51,21 @@ def country_to_dict(country):
 @country_bp.route('/image/<path:filename>', methods=['GET'])
 def get_country_logo(filename):
     """Serve country logo images from the country asset directory."""
-    return send_from_directory(_country_assets_dir(), Path(filename).name)
+    logo_image, image_file = filename, None
+    class LogoRef:
+        company_id = None
+        name = ''
+        logo_image = filename
+    _, image_file = resolve_country_logo_asset(LogoRef(), assets_dir=_country_assets_dir())
+    if not image_file:
+        return jsonify({'status': 'error', 'message': 'Country logo not found'}), 404
+    return send_file(image_file)
 
 
 @country_bp.route('/', methods=['GET'])
 def list_countries():
     """List all managed countries."""
-    countries = Country.query.order_by(Country.name.asc()).all()
+    countries = Country.query.filter_by(company_id=current_company_id()).order_by(Country.name.asc()).all()
     return jsonify({
         'status': 'success',
         'data': [country_to_dict(country) for country in countries],
@@ -74,7 +84,11 @@ def create_country():
                 'message': 'Country name is required'
             }), 400
 
-        existing = Country.query.filter(db.func.lower(Country.name) == name.lower()).first()
+        company_id = current_company_id()
+        existing = Country.query.filter(
+            Country.company_id == company_id,
+            db.func.lower(Country.name) == name.lower(),
+        ).first()
         if existing:
             return jsonify({
                 'status': 'error',
@@ -85,6 +99,7 @@ def create_country():
             name,
             currency_code=data.get('currency_code'),
             logo_image=data.get('logo_image'),
+            company_id=company_id,
         )
         country.is_active = bool(data.get('is_active', True))
         db.session.commit()
@@ -120,6 +135,7 @@ def update_country(country_id):
                 }), 400
 
             existing = Country.query.filter(
+                Country.company_id == country.company_id,
                 db.func.lower(Country.name) == name.lower(),
                 Country.id != country.id,
             ).first()
@@ -131,7 +147,7 @@ def update_country(country_id):
 
             old_name = country.name
             country.name = name
-            Product.query.filter_by(country_of_origin=old_name).update(
+            Product.query.filter_by(company_id=country.company_id, country_of_origin=old_name).update(
                 {'country_of_origin': name},
                 synchronize_session=False,
             )
@@ -191,7 +207,8 @@ def upload_country_flag(country_id):
                 'message': 'Country name is required before uploading a flag'
             }), 400
 
-        output_dir = _country_assets_dir()
+        company = current_company()
+        output_dir = _country_assets_dir() / company.slug
         output_dir.mkdir(parents=True, exist_ok=True)
         output_path = output_dir / f'{slug}.jpg'
 
@@ -210,7 +227,7 @@ def upload_country_flag(country_id):
                 optimize=True,
             )
 
-        country.logo_image = f'assets/countries/{slug}.jpg'
+        country.logo_image = str(output_path.relative_to(_project_root()))
         db.session.commit()
 
         return jsonify({
@@ -238,7 +255,10 @@ def delete_country(country_id):
     """Delete an unused country."""
     try:
         country = _country_by_id(country_id)
-        product_count = Product.query.filter_by(country_of_origin=country.name).count()
+        product_count = Product.query.filter_by(
+            company_id=country.company_id,
+            country_of_origin=country.name,
+        ).count()
         if product_count:
             return jsonify({
                 'status': 'error',

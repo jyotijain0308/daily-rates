@@ -1,0 +1,89 @@
+<div class="modal-overlay" id="shareModal" style="display:none;">
+    <div class="modal share-modal">
+        <div class="modal-header">
+            <h2>Share MP4</h2>
+            <button type="button" class="modal-close" id="closeShareModalBtn">&times;</button>
+        </div>
+        <div class="share-panel">
+            <div class="share-file-name" id="shareFileName" hidden></div>
+            <div class="share-compose-column">
+                <div class="form-grid share-title-grid">
+                    <div class="form-group">
+                        <label for="sharePostTitle">Title</label>
+                        <input type="text" id="sharePostTitle" class="input" maxlength="255">
+                    </div>
+                    <div class="form-group">
+                        <label for="sharePostVisibility">Visibility</label>
+                        <select id="sharePostVisibility" class="input">
+                            <option value="private">Private</option>
+                            <option value="unlisted">Unlisted</option>
+                            <option value="public">Public</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="sharePostDescription">Description</label>
+                    <textarea id="sharePostDescription" class="input textarea share-description" rows="4"></textarea>
+                </div>
+                <div class="share-actions">
+                    <button type="button" class="btn btn-secondary" id="generateHashtagsBtn">Generate AI Hashtags</button>
+                    <button type="button" class="btn btn-secondary" id="copyShareCaptionBtn">Copy Description</button>
+                    <button type="button" class="btn btn-secondary" id="copyShareLinkBtn">Copy Link</button>
+                    <a href="#" class="btn btn-secondary" id="shareDownloadBtn">Download MP4</a>
+                </div>
+                <p class="text-muted share-status-note" id="hashtagGeneratorStatus"></p>
+            </div>
+            <div class="share-publish-column">
+                <div class="youtube-publish-box">
+                    <div class="card-header-row">
+                        <h3>Direct YouTube Publish</h3>
+                        <span class="status-pill status-inactive" id="shareYouTubeStatus">Checking</span>
+                    </div>
+                    <button type="button" class="btn btn-primary" id="publishYouTubeBtn" disabled>Publish to YouTube</button>
+                    <p class="text-muted" id="youtubePublishMessage">Connect YouTube in Company settings first.</p>
+                </div>
+                <div class="youtube-publish-box">
+                    <div class="card-header-row">
+                        <h3>Direct Facebook Page Publish</h3>
+                        <span class="status-pill status-inactive" id="shareFacebookStatus">Checking</span>
+                    </div>
+                    <button type="button" class="btn btn-primary" id="publishFacebookBtn" disabled>Publish to Facebook Page</button>
+                    <p class="text-muted" id="facebookPublishMessage">Connect Facebook in Company settings first.</p>
+                </div>
+                <div class="youtube-publish-box">
+                    <div class="card-header-row">
+                        <h3>Direct Instagram Publish</h3>
+                        <span class="status-pill status-inactive" id="shareInstagramStatus">Checking</span>
+                    </div>
+                    <button type="button" class="btn btn-primary" id="publishInstagramBtn" disabled>Publish to Instagram</button>
+                    <p class="text-muted" id="instagramPublishMessage">Connect Facebook Page with Instagram in Company settings first.</p>
+                </div>
+                <div class="youtube-publish-box">
+                    <div class="card-header-row">
+                        <h3>Direct X Publish</h3>
+                        <span class="status-pill status-inactive" id="shareXStatus">Checking</span>
+                    </div>
+                    <button type="button" class="btn btn-primary" id="publishXBtn" disabled>Publish to X</button>
+                    <p class="text-muted" id="xPublishMessage">Connect X in Company settings first.</p>
+                </div>
+                <div class="youtube-publish-box">
+                    <div class="card-header-row">
+                        <h3>Direct LinkedIn Personal Publish</h3>
+                        <span class="status-pill status-inactive" id="shareLinkedInPersonalStatus">Checking</span>
+                    </div>
+                    <button type="button" class="btn btn-primary" id="publishLinkedInPersonalBtn" disabled>Publish to LinkedIn Profile</button>
+                    <p class="text-muted" id="linkedinPersonalPublishMessage">Connect LinkedIn personal profile in Company settings first.</p>
+                </div>
+                <div class="youtube-publish-box">
+                    <div class="card-header-row">
+                        <h3>Direct LinkedIn Page Publish</h3>
+                        <span class="status-pill status-inactive" id="shareLinkedInStatus">Checking</span>
+                    </div>
+                    <button type="button" class="btn btn-primary" id="publishLinkedInBtn" disabled>Publish to LinkedIn Page</button>
+                    <p class="text-muted" id="linkedinPublishMessage">Connect LinkedIn Page in Company settings first.</p>
+                </div>
+                <div class="share-platform-grid" id="sharePlatformGrid"></div>
+            </div>
+        </div>
+    </div>
+</div>

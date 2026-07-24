@@ -2,8 +2,9 @@
 Database initialization and management utilities
 """
 import logging
+from app.services.company_service import current_company_id
 from wsgi import create_app, db
-from models import Product, ProductRateHistory, GenerationHistory
+from app.models import Product, ProductRateHistory, GenerationHistory
 
 logger = logging.getLogger(__name__)
 
@@ -44,14 +45,15 @@ def seed_sample_data():
         if existing_products > 0:
             logger.info(f"Database already has {existing_products} products, skipping seed")
             return
+        company_id = current_company_id()
         
         sample_products = [
-            Product(serial_no=1, country_of_origin="India", shipment_by="Air", product_name="Wheat Flour", weight_kg=25, packing="Bag", price_aed=72.50),
-            Product(serial_no=2, country_of_origin="Thailand", shipment_by="Sea", product_name="Jasmine Rice", weight_kg=50, packing="Sack", price_aed=158.00),
-            Product(serial_no=3, country_of_origin="Brazil", shipment_by="Sea", product_name="Soybean Meal", weight_kg=40, packing="Bag", price_aed=121.25),
-            Product(serial_no=4, country_of_origin="United States", shipment_by="Air", product_name="Almonds", weight_kg=10, packing="Carton", price_aed=96.00),
-            Product(serial_no=5, country_of_origin="Australia", shipment_by="Sea", product_name="Chickpeas", weight_kg=25, packing="Bag", price_aed=88.75),
-            Product(serial_no=6, country_of_origin="Vietnam", shipment_by="Sea", product_name="Black Pepper", weight_kg=5, packing="Carton", price_aed=64.50),
+            Product(company_id=company_id, serial_no=1, country_of_origin="India", shipment_by="Air", product_name="Wheat Flour", weight_kg="25", packing="Bag", price_aed=72.50),
+            Product(company_id=company_id, serial_no=2, country_of_origin="Thailand", shipment_by="Sea", product_name="Jasmine Rice", weight_kg="50", packing="Sack", price_aed=158.00),
+            Product(company_id=company_id, serial_no=3, country_of_origin="Brazil", shipment_by="Sea", product_name="Soybean Meal", weight_kg="40", packing="Bag", price_aed=121.25),
+            Product(company_id=company_id, serial_no=4, country_of_origin="United States", shipment_by="Air", product_name="Almonds", weight_kg="10", packing="Carton", price_aed=96.00),
+            Product(company_id=company_id, serial_no=5, country_of_origin="Australia", shipment_by="Sea", product_name="Chickpeas", weight_kg="25", packing="Bag", price_aed=88.75),
+            Product(company_id=company_id, serial_no=6, country_of_origin="Vietnam", shipment_by="Sea", product_name="Black Pepper", weight_kg="5", packing="Carton", price_aed=64.50),
         ]
         
         db.session.add_all(sample_products)

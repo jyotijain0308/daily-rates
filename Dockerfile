@@ -19,7 +19,7 @@ RUN pip install --upgrade pip && pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-RUN mkdir -p output uploads instance src/assets/products src/assets/countries
+RUN mkdir -p uploads/assets/products uploads/assets/countries/default uploads/assets/company uploads/generated/videos uploads/generated/presentations uploads/jobs/generation instance
 
 EXPOSE 8000
 

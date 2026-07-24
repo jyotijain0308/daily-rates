@@ -6,9 +6,9 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from unittest.mock import patch
 
-from output_cleanup import cleanup_old_generation_artifacts, cleanup_previous_day_outputs
+from app.services.generation.cleanup_service import cleanup_old_generation_artifacts, cleanup_previous_day_outputs
 from wsgi import create_app, db
-from models import GenerationHistory
+from app.models import GenerationHistory
 
 
 class TestOutputCleanup(unittest.TestCase):
@@ -27,7 +27,7 @@ class TestOutputCleanup(unittest.TestCase):
             old_timestamp = yesterday.timestamp()
             os.utime(old_file, (old_timestamp, old_timestamp))
 
-            with patch("output_cleanup.OUTPUT_CLEANUP_DIRS", [tmpdir]):
+            with patch("app.services.generation.cleanup_service.OUTPUT_CLEANUP_DIRS", [tmpdir]):
                 deleted = cleanup_previous_day_outputs(today=date.today())
 
             self.assertEqual(deleted, 1)
@@ -67,7 +67,7 @@ class TestOutputCleanup(unittest.TestCase):
                     ))
                     db.session.commit()
 
-                    with patch("output_cleanup.OUTPUT_CLEANUP_DIRS", [tmpdir]):
+                    with patch("app.services.generation.cleanup_service.OUTPUT_CLEANUP_DIRS", [tmpdir]):
                         summary = cleanup_old_generation_artifacts(days=7)
 
                     self.assertEqual(summary["deleted_history_rows"], 1)

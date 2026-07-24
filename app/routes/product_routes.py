@@ -4,13 +4,13 @@ Product management API routes
 import logging
 from pathlib import Path
 
-from flask import Blueprint, request, jsonify, send_from_directory, url_for, Response
+from flask import Blueprint, request, jsonify, send_file, url_for, Response
 from PIL import UnidentifiedImageError
-from country_service import active_country_names, ensure_country
-from csv_importer import products_to_csv
-from src.config import COMPANY_DEFAULT_COUNTRY, CURRENCY
-from src.product_image_service import ProductImageService
-from models import Country, Product, ProductRateHistory
+from app.services.company_service import current_company_id, current_company_settings
+from app.services.country_service import active_country_names, ensure_country
+from app.services.importing.csv_importer import products_to_csv
+from app.services.generation.product_image_service import ProductImageService
+from app.models import Country, Product, ProductRateHistory
 from wsgi import db
 
 logger = logging.getLogger(__name__)
@@ -27,30 +27,37 @@ def product_to_dict(product):
         fetch_if_missing=False,
     )
     if image_path:
-        image_file = product_image_service.assets_root / image_path
+        image_file = product_image_service._resolve_asset(image_path)
         version = int(image_file.stat().st_mtime) if image_file.exists() else None
         data['image_url'] = url_for(
             'products.get_product_image',
             filename=Path(image_path).name,
             v=version,
         )
+        data['has_image'] = True
     else:
         data['image_url'] = None
+        data['has_image'] = False
     return data
 
 
 @product_bp.route('/image/<path:filename>', methods=['GET'])
 def get_product_image(filename):
     """Serve cached product images used by PPT/MP4 generation."""
-    image_dir = product_image_service.assets_root / 'assets' / 'products'
-    return send_from_directory(image_dir, Path(filename).name)
+    safe_name = Path(filename).name
+    image_file = product_image_service._resolve_asset(
+        f'{product_image_service._upload_relative_dir()}/{safe_name}'
+    )
+    if image_file:
+        return send_file(image_file)
+    return jsonify({'status': 'error', 'message': 'Product image not found'}), 404
 
 
 @product_bp.route('/<int:product_id>/image', methods=['POST'])
 def update_product_image(product_id):
     """Upload a manual image override for a product."""
     try:
-        product = Product.query.get_or_404(product_id)
+        product = Product.query.filter_by(id=product_id, company_id=current_company_id()).first_or_404()
 
         if 'file' not in request.files:
             return jsonify({
@@ -96,7 +103,7 @@ def update_product_image(product_id):
 def fetch_product_image_from_pexels(product_id):
     """Fetch or refresh a product image from Pexels."""
     try:
-        product = Product.query.get_or_404(product_id)
+        product = Product.query.filter_by(id=product_id, company_id=current_company_id()).first_or_404()
         image_path = product_image_service.fetch_product_image(
             product.product_name,
             product.country_of_origin,
@@ -126,7 +133,7 @@ def fetch_product_image_from_pexels(product_id):
 def search_product_images_from_pexels(product_id):
     """Search Pexels for selectable product image candidates."""
     try:
-        product = Product.query.get_or_404(product_id)
+        product = Product.query.filter_by(id=product_id, company_id=current_company_id()).first_or_404()
         payload = request.get_json(silent=True) or {}
         description = (payload.get('description') or '').strip()
         page = payload.get('page') or 1
@@ -163,7 +170,7 @@ def search_product_images_from_pexels(product_id):
 def select_product_image_from_pexels(product_id):
     """Save a selected Pexels image for a product."""
     try:
-        product = Product.query.get_or_404(product_id)
+        product = Product.query.filter_by(id=product_id, company_id=current_company_id()).first_or_404()
         payload = request.get_json(silent=True) or {}
         image_url = (payload.get('image_url') or '').strip()
 
@@ -206,7 +213,7 @@ def get_all_products():
         per_page = request.args.get('per_page', 50, type=int)
         
         # Pagination
-        paginated = Product.query.paginate(page=page, per_page=per_page)
+        paginated = Product.query.filter_by(company_id=current_company_id()).paginate(page=page, per_page=per_page)
         
         return jsonify({
             'status': 'success',
@@ -230,7 +237,7 @@ def get_all_products():
 def export_products():
     """Export all products as a CSV sheet that can be imported after rate updates."""
     try:
-        products = Product.query.order_by(
+        products = Product.query.filter_by(company_id=current_company_id()).order_by(
             Product.serial_no.is_(None),
             Product.serial_no,
             Product.product_name,
@@ -256,26 +263,49 @@ def export_products():
 def get_stats():
     """Get product statistics"""
     try:
-        total_products = Product.query.count()
-        total_countries = Country.query.count()
-        active_countries = Country.query.filter_by(is_active=True).count()
+        company_id = current_company_id()
+        settings = current_company_settings()
+        total_products = Product.query.filter_by(company_id=company_id).count()
+        products = Product.query.filter_by(company_id=company_id).all()
+        missing_image_products = []
+        for product in products:
+            image_path = product_image_service.get_product_image_path(
+                product.product_name,
+                product.country_of_origin,
+                fetch_if_missing=False,
+            )
+            if not image_path:
+                missing_image_products.append(product)
+        products_missing_images = len(missing_image_products)
+        total_countries = Country.query.filter_by(company_id=company_id).count()
+        active_countries = Country.query.filter_by(company_id=company_id, is_active=True).count()
         countries = db.session.query(
             Product.country_of_origin, db.func.count(Product.id)
-        ).group_by(Product.country_of_origin).all()
+        ).filter(Product.company_id == company_id).group_by(Product.country_of_origin).all()
         shipments = db.session.query(
             Product.shipment_by, db.func.count(Product.id)
-        ).group_by(Product.shipment_by).all()
+        ).filter(Product.company_id == company_id).group_by(Product.shipment_by).all()
 
         return jsonify({
             'status': 'success',
             'data': {
                 'total_products': total_products,
+                'products_missing_images': products_missing_images,
+                'missing_image_products': [
+                    {
+                        'id': product.id,
+                        'product_name': product.product_name,
+                        'country_of_origin': product.country_of_origin,
+                        'shipment_by': product.shipment_by,
+                    }
+                    for product in missing_image_products[:5]
+                ],
                 'total_countries': total_countries,
                 'active_countries': active_countries,
                 'countries': {country: count for country, count in countries},
                 'shipments': {shipment: count for shipment, count in shipments},
-                'company_default_country': COMPANY_DEFAULT_COUNTRY,
-                'currency': CURRENCY
+                'company_default_country': settings.default_country,
+                'currency': settings.currency
             }
         }), 200
     except Exception as e:
@@ -289,10 +319,11 @@ def get_stats():
 @product_bp.route('/countries', methods=['GET'])
 def get_countries():
     """Get active managed countries for product rates"""
+    settings = current_company_settings()
     return jsonify({
         'status': 'success',
         'data': active_country_names(),
-        'default_country': COMPANY_DEFAULT_COUNTRY
+        'default_country': settings.default_country
     }), 200
 
 
@@ -300,7 +331,7 @@ def get_countries():
 def get_product(product_id):
     """Get a specific product by ID"""
     try:
-        product = Product.query.get_or_404(product_id)
+        product = Product.query.filter_by(id=product_id, company_id=current_company_id()).first_or_404()
         return jsonify({
             'status': 'success',
             'data': product_to_dict(product)
@@ -337,19 +368,26 @@ def create_product():
         # Validate data types
         try:
             serial_no = int(data['serial_no']) if data.get('serial_no') not in (None, '') else None
-            weight_kg = float(data['weight_kg'])
             price_aed = float(data['price_aed'])
         except (ValueError, TypeError):
             return jsonify({
                 'status': 'error',
-                'message': "serial_no must be a whole number, weight_kg and price_aed must be valid numbers"
+                'message': "serial_no must be a whole number and price_aed must be a valid number"
+            }), 400
+        weight_kg = str(data['weight_kg']).strip()
+        if not weight_kg:
+            return jsonify({
+                'status': 'error',
+                'message': "weight_kg cannot be empty"
             }), 400
         
+        company_id = current_company_id()
         country_of_origin = data['country_of_origin'].strip()
-        ensure_country(country_of_origin)
+        ensure_country(country_of_origin, company_id=company_id)
 
         # Create product
         product = Product(
+            company_id=company_id,
             serial_no=serial_no,
             country_of_origin=country_of_origin,
             shipment_by=data['shipment_by'].strip(),
@@ -388,7 +426,7 @@ def create_product():
 def update_product(product_id):
     """Update a product (e.g., update rates)"""
     try:
-        product = Product.query.get_or_404(product_id)
+        product = Product.query.filter_by(id=product_id, company_id=current_company_id()).first_or_404()
         data = request.get_json()
         old_price_aed = float(product.price_aed)
         
@@ -413,7 +451,7 @@ def update_product(product_id):
                             'status': 'error',
                             'message': f"{field} must be a whole number"
                         }), 400
-                elif field in ['weight_kg', 'price_aed']:
+                elif field == 'price_aed':
                     try:
                         setattr(product, field, float(data[field]))
                     except (ValueError, TypeError):
@@ -421,11 +459,19 @@ def update_product(product_id):
                             'status': 'error',
                             'message': f"{field} must be a valid number"
                         }), 400
+                elif field == 'weight_kg':
+                    weight_value = str(data[field]).strip()
+                    if not weight_value:
+                        return jsonify({
+                            'status': 'error',
+                            'message': "weight_kg cannot be empty"
+                        }), 400
+                    setattr(product, field, weight_value)
                 else:
                     setattr(product, field, data[field].strip() if isinstance(data[field], str) else data[field])
 
         if 'country_of_origin' in data:
-            ensure_country(product.country_of_origin)
+            ensure_country(product.country_of_origin, company_id=product.company_id)
         
         if 'price_aed' in data and float(product.price_aed) != old_price_aed:
             db.session.add(ProductRateHistory(
@@ -457,7 +503,7 @@ def update_product(product_id):
 def delete_product(product_id):
     """Delete a product"""
     try:
-        product = Product.query.get_or_404(product_id)
+        product = Product.query.filter_by(id=product_id, company_id=current_company_id()).first_or_404()
         product_name = product.product_name
         
         db.session.delete(product)

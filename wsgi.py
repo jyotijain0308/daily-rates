@@ -5,7 +5,8 @@ import os
 import logging
 import sys
 import click
-from flask import Flask
+from datetime import timedelta
+from flask import Flask, jsonify, redirect, request, url_for
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 from sqlalchemy import inspect, text
@@ -22,11 +23,42 @@ migrate = Migrate() if Migrate else None
 logger = logging.getLogger(__name__)
 
 
+def running_in_docker() -> bool:
+    """Return True when the app is running inside a Docker container."""
+    return os.path.exists('/.dockerenv')
+
+
+def load_local_env() -> None:
+    """Load project .env values for direct local Python commands."""
+    env_path = os.path.join(os.path.dirname(__file__), '.env')
+    if not os.path.exists(env_path):
+        return
+
+    with open(env_path, encoding='utf-8') as env_file:
+        for raw_line in env_file:
+            line = raw_line.strip()
+            if not line or line.startswith('#') or '=' not in line:
+                continue
+
+            key, value = line.split('=', 1)
+            key = key.strip()
+            value = value.strip().strip('"').strip("'")
+            os.environ.setdefault(key, value)
+
+    if not running_in_docker() and os.getenv('HOST_DATABASE_URL'):
+        os.environ['DATABASE_URL'] = os.getenv('HOST_DATABASE_URL')
+
+
 def get_database_uri() -> str:
-    """Return the configured database URI, defaulting to local SQLite."""
+    """Return the configured PostgreSQL database URI."""
+    load_local_env()
     database_url = os.getenv('DATABASE_URL')
     if not database_url:
-        return 'sqlite:///ppt_products.db'
+        raise RuntimeError(
+            "DATABASE_URL is required. This project uses PostgreSQL. Start a "
+            "reachable PostgreSQL server and set DATABASE_URL before running "
+            "the app or Python commands."
+        )
 
     # Some platforms still expose SQLAlchemy's old postgres:// scheme.
     if database_url.startswith('postgres://'):
@@ -86,6 +118,25 @@ def ensure_database_schema():
             logger.info("Rebuilt products table for shipment product schema")
 
 
+def ensure_company_tenancy_columns():
+    """Backfill company_id columns for local databases not upgraded by Alembic."""
+    inspector = inspect(db.engine)
+    table_names = inspector.get_table_names()
+
+    for table_name in ['products', 'countries', 'generation_history', 'background_audio']:
+        if table_name not in table_names:
+            continue
+
+        columns = {column['name'] for column in inspector.get_columns(table_name)}
+        if 'company_id' not in columns:
+            db.session.execute(text(
+                f"ALTER TABLE {table_name} "
+                "ADD COLUMN company_id INTEGER NOT NULL DEFAULT 1"
+            ))
+            db.session.commit()
+            logger.info("Added company_id column to %s", table_name)
+
+
 def is_flask_migration_command() -> bool:
     """Return True when Flask-Migrate/Alembic should manage schema changes."""
     return 'db' in sys.argv
@@ -98,12 +149,20 @@ def create_app(config=None):
                 static_folder='app/static')
     
     # Default configuration
-    app.config['SQLALCHEMY_DATABASE_URI'] = get_database_uri()
+    configured_database_uri = (
+        config.get('SQLALCHEMY_DATABASE_URI')
+        if config and 'SQLALCHEMY_DATABASE_URI' in config
+        else get_database_uri()
+    )
+    app.config['SQLALCHEMY_DATABASE_URI'] = configured_database_uri
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file upload
     app.config['UPLOAD_FOLDER'] = 'uploads'
-    app.config['COUNTRY_ASSETS_DIR'] = 'src/assets/countries'
+    app.config['ASSET_UPLOADS_DIR'] = 'uploads/assets'
+    app.config['COUNTRY_ASSETS_DIR'] = 'uploads/assets/countries'
     app.config['GENERATION_AUDIO_DIR'] = 'uploads/audio'
+    app.config['SECRET_KEY'] = os.getenv('SECRET_KEY') or os.getenv('FLASK_SECRET_KEY') or 'dev-change-me'
+    app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=14)
     
     # Override with custom config if provided
     if config:
@@ -122,44 +181,85 @@ def create_app(config=None):
     
     # Create necessary directories
     os.makedirs(app.config.get('UPLOAD_FOLDER', 'uploads'), exist_ok=True)
+    os.makedirs(app.config.get('ASSET_UPLOADS_DIR', 'uploads/assets'), exist_ok=True)
+    os.makedirs(app.config.get('COUNTRY_ASSETS_DIR', 'uploads/assets/countries'), exist_ok=True)
     os.makedirs(app.config.get('GENERATION_AUDIO_DIR', 'uploads/audio'), exist_ok=True)
-    os.makedirs('output', exist_ok=True)
-    os.makedirs('src/output', exist_ok=True)
+    from app.services.storage_service import ensure_storage_dirs
+    ensure_storage_dirs()
 
-    from output_cleanup import cleanup_previous_day_outputs
+    from app.services.generation.cleanup_service import cleanup_previous_day_outputs
     cleanup_previous_day_outputs()
     
     # Register blueprints
     with app.app_context():
         # Import models
-        from models import BackgroundAudio, Country, Product, ProductRateHistory, GenerationHistory
+        from app.models import (
+            BackgroundAudio,
+            Company,
+            CompanySettings,
+            Country,
+            GenerationHistory,
+            Product,
+            ProductRateHistory,
+            SocialConnection,
+            SocialPublishHistory,
+            User,
+        )
 
         # Local/test startup keeps backward compatibility. Migration commands
         # skip this so Alembic can create/upgrade tables itself.
         if not is_flask_migration_command():
             db.create_all()
             ensure_database_schema()
-            from country_service import seed_default_countries
+            from app.services.company_service import ensure_default_company
+            ensure_default_company()
+            ensure_company_tenancy_columns()
+            from app.services.country_service import seed_default_countries
             seed_default_countries()
         logger.info("Database initialized")
         
         # Register route blueprints
         from app.routes.import_routes import import_bp
+        from app.routes.company_routes import company_bp
         from app.routes.product_routes import product_bp
         from app.routes.country_routes import country_bp
         from app.routes.generation_routes import generation_bp
+        from app.routes.social_routes import social_bp
+        from app.routes.auth_routes import auth_bp
         from app.routes.page_routes import page_bp
+        app.register_blueprint(auth_bp)
+        app.register_blueprint(company_bp)
         app.register_blueprint(import_bp)
         app.register_blueprint(product_bp)
         app.register_blueprint(country_bp)
         app.register_blueprint(generation_bp)
+        app.register_blueprint(social_bp)
         app.register_blueprint(page_bp)
+
+    @app.context_processor
+    def inject_auth_context():
+        from app.services.auth_service import current_user
+        return {'current_user': current_user()}
+
+    @app.before_request
+    def require_authenticated_user():
+        if _is_public_request():
+            return None
+
+        from app.services.auth_service import current_user
+        if current_user():
+            return None
+
+        if request.path.startswith('/api/'):
+            return jsonify({'status': 'error', 'message': 'Authentication required'}), 401
+
+        return redirect(url_for('auth.signin', next=request.full_path if request.query_string else request.path))
 
     @app.cli.command('cleanup-generations')
     @click.option('--days', default=7, show_default=True, type=int, help='Delete generation artifacts older than this many days.')
     def cleanup_generations_command(days):
         """Delete old generated files, job files, and generation history rows."""
-        from output_cleanup import cleanup_old_generation_artifacts
+        from app.services.generation.cleanup_service import cleanup_old_generation_artifacts
 
         summary = cleanup_old_generation_artifacts(days=days)
         click.echo(
@@ -174,3 +274,22 @@ def create_app(config=None):
         return {"status": "healthy", "version": "1.0"}, 200
     
     return app
+
+
+def _is_public_request():
+    endpoint = request.endpoint or ''
+    if endpoint == 'static' or endpoint == 'health':
+        return True
+    if endpoint.startswith('auth.'):
+        return True
+    if endpoint in {
+        'social.youtube_callback',
+        'social.facebook_callback',
+        'social.linkedin_callback',
+        'social.tiktok_callback',
+        'social.x_callback',
+    }:
+        return True
+    if endpoint == 'generation.preview_mp4':
+        return True
+    return False

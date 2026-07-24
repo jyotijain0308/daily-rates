@@ -2,9 +2,10 @@ let csvContent = null;
 let selectedFile = null;
 
 const csvUploadZone = document.getElementById('csvUploadZone');
-const imageUploadZone = document.getElementById('imageUploadZone');
+// Image import is intentionally disabled. CSV import remains active.
+// const imageUploadZone = document.getElementById('imageUploadZone');
 const csvFileInput = document.getElementById('csvFileInput');
-const imageFileInput = document.getElementById('imageFileInput');
+// const imageFileInput = document.getElementById('imageFileInput');
 const previewSection = document.getElementById('previewSection');
 const previewTable = document.querySelector('#previewTable tbody');
 const saveBtn = document.getElementById('saveImportBtn');
@@ -19,17 +20,17 @@ const selectedFileInfo = document.getElementById('selectedFileInfo');
 let latestPreview = null;
 
 registerUploadZone(csvUploadZone, csvFileInput, handleCsvFile);
-registerUploadZone(imageUploadZone, imageFileInput, handleImageFile);
+// registerUploadZone(imageUploadZone, imageFileInput, handleImageFile);
 
 csvFileInput.addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (file) handleCsvFile(file);
 });
 
-imageFileInput.addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if (file) handleImageFile(file);
-});
+// imageFileInput.addEventListener('change', (e) => {
+//     const file = e.target.files[0];
+//     if (file) handleImageFile(file);
+// });
 
 document.getElementById('downloadTemplateBtn').addEventListener('click', async () => {
     try {
@@ -96,32 +97,32 @@ async function handleCsvFile(file) {
     }
 }
 
-async function handleImageFile(file) {
-    const allowedExtensions = ['.png', '.jpg', '.jpeg', '.webp', '.bmp', '.tiff'];
-    const lowerName = file.name.toLowerCase();
-    if (!allowedExtensions.some(ext => lowerName.endsWith(ext))) {
-        showError('Please select a PNG, JPG, JPEG, WEBP, BMP, or TIFF image');
-        return;
-    }
-
-    selectedFile = file;
-    selectedFileInfo.style.display = 'block';
-    selectedFileInfo.textContent = `Selected image: ${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
-
-    try {
-        saveBtn.disabled = true;
-        saveBtn.textContent = 'Reading image...';
-        const result = await API.previewImageImport(file);
-        csvContent = result.content;
-        showPreview(result.preview);
-        showInfo('Image table extracted — review OCR results before saving');
-    } catch (err) {
-        showError(err.message);
-        resetPreview();
-    } finally {
-        saveBtn.textContent = 'Save to Database';
-    }
-}
+// async function handleImageFile(file) {
+//     const allowedExtensions = ['.png', '.jpg', '.jpeg', '.webp', '.bmp', '.tiff'];
+//     const lowerName = file.name.toLowerCase();
+//     if (!allowedExtensions.some(ext => lowerName.endsWith(ext))) {
+//         showError('Please select a PNG, JPG, JPEG, WEBP, BMP, or TIFF image');
+//         return;
+//     }
+//
+//     selectedFile = file;
+//     selectedFileInfo.style.display = 'block';
+//     selectedFileInfo.textContent = `Selected image: ${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+//
+//     try {
+//         saveBtn.disabled = true;
+//         saveBtn.textContent = 'Reading image...';
+//         const result = await API.previewImageImport(file);
+//         csvContent = result.content;
+//         showPreview(result.preview);
+//         showInfo('Image table extracted — review OCR results before saving');
+//     } catch (err) {
+//         showError(err.message);
+//         resetPreview();
+//     } finally {
+//         saveBtn.textContent = 'Save to Database';
+//     }
+// }
 
 function showPreview(preview) {
     latestPreview = preview;
@@ -177,7 +178,7 @@ function showPreview(preview) {
             <td>${escapeHtml(row.product_name)}</td>
             <td>${escapeHtml(row.country_of_origin)}</td>
             <td>${escapeHtml(row.shipment_by)}</td>
-            <td>${Number(row.weight_kg).toLocaleString('en-IN', { maximumFractionDigits: 2 })}</td>
+            <td>${escapeHtml(row.weight_kg)}</td>
             <td>${escapeHtml(row.packing)}</td>
             <td>${row.old_price_aed === null || row.old_price_aed === undefined ? '—' : `AED ${formatRate(row.old_price_aed)}`}</td>
             <td>AED ${formatRate(row.new_price_aed ?? row.price_aed)}</td>
@@ -236,7 +237,7 @@ function resetImport() {
     csvContent = null;
     selectedFile = null;
     csvFileInput.value = '';
-    imageFileInput.value = '';
+    // imageFileInput.value = '';
     selectedFileInfo.style.display = 'none';
     resetPreview();
 }

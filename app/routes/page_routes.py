@@ -1,7 +1,7 @@
 """
 Web UI page routes
 """
-from flask import Blueprint, render_template
+from flask import Blueprint, abort, render_template
 
 page_bp = Blueprint('pages', __name__)
 
@@ -16,9 +16,14 @@ def import_page():
     return render_template('import.html', active_page='import')
 
 
+# PDF import is intentionally disabled.
+# @page_bp.route('/import-pdf')
+# def import_pdf_page():
+#     return render_template('import_pdf.html', active_page='import_pdf')
 @page_bp.route('/import-pdf')
-def import_pdf_page():
-    return render_template('import_pdf.html', active_page='import_pdf')
+def import_pdf_page_disabled():
+    abort(404)
+
 
 
 @page_bp.route('/products')
@@ -29,6 +34,11 @@ def products_page():
 @page_bp.route('/countries')
 def countries_page():
     return render_template('countries.html', active_page='countries')
+
+
+@page_bp.route('/company')
+def company_page():
+    return render_template('company.html', active_page='company')
 
 
 @page_bp.route('/generate')
