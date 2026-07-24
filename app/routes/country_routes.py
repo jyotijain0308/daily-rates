@@ -227,7 +227,7 @@ def upload_country_flag(country_id):
                 optimize=True,
             )
 
-        country.logo_image = str(output_path.relative_to(_project_root()))
+        country.logo_image = f'uploads/assets/countries/{company.slug}/{slug}.jpg'
         db.session.commit()
 
         return jsonify({

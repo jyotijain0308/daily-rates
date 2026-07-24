@@ -63,7 +63,7 @@ def _asset_url(asset_path):
 
     return url_for(
         'companies.get_company_asset',
-        filename=asset_path,
+        filename=Path(asset_path).name,
         v=int(asset_file.stat().st_mtime),
     )
 

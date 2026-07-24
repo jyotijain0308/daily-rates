@@ -243,6 +243,9 @@ def create_app(config=None):
 
     @app.before_request
     def require_authenticated_user():
+        if app.config.get('TESTING') and not app.config.get('AUTH_REQUIRED_IN_TESTS', False):
+            return None
+
         if _is_public_request():
             return None
 

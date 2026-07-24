@@ -5,6 +5,7 @@ Adapts existing ppt_generator.py to work with database products
 import logging
 import os
 import re
+import sys
 from datetime import date, datetime
 from pathlib import Path
 
@@ -23,6 +24,10 @@ from app.models import Product, GenerationHistory
 from wsgi import db
 
 logger = logging.getLogger(__name__)
+
+# Backward-compatible import path for older tests and scripts that patch
+# ppt_service.PPTGenerationService after the service moved under app/services.
+sys.modules.setdefault('ppt_service', sys.modules[__name__])
 
 
 class GenerationCancelled(Exception):

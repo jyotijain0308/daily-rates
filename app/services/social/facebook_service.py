@@ -1,5 +1,6 @@
 """Facebook OAuth and Page video publishing helpers."""
 import os
+import sys
 import time
 import uuid
 from datetime import datetime, timedelta
@@ -24,6 +25,10 @@ FACEBOOK_SCOPES = (
     'instagram_content_publish',
     'business_management',
 )
+
+# Backward-compatible import path for older tests that patch
+# facebook_service.requests after importing this module by package path.
+sys.modules.setdefault('facebook_service', sys.modules[__name__])
 
 
 class FacebookConfigError(RuntimeError):
