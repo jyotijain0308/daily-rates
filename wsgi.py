@@ -203,6 +203,7 @@ def create_app(config=None):
             ProductRateHistory,
             SocialConnection,
             SocialPublishHistory,
+            SystemConfiguration,
             User,
         )
 
@@ -225,9 +226,11 @@ def create_app(config=None):
         from app.routes.country_routes import country_bp
         from app.routes.generation_routes import generation_bp
         from app.routes.social_routes import social_bp
+        from app.routes.system_routes import system_bp
         from app.routes.auth_routes import auth_bp
         from app.routes.page_routes import page_bp
         app.register_blueprint(auth_bp)
+        app.register_blueprint(system_bp)
         app.register_blueprint(company_bp)
         app.register_blueprint(import_bp)
         app.register_blueprint(product_bp)

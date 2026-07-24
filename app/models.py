@@ -1,4 +1,5 @@
 """Database models for PPT Daily Rates System"""
+import json
 from datetime import datetime
 from wsgi import db
 
@@ -330,6 +331,47 @@ class SocialConnection(db.Model):
             'created_at': self.created_at.isoformat(),
             'updated_at': self.updated_at.isoformat(),
         }
+
+
+class SystemConfiguration(db.Model):
+    """System-wide configuration values stored as JSON."""
+    __tablename__ = 'system_configurations'
+
+    id = db.Column(db.Integer, primary_key=True)
+    key = db.Column(db.String(120), nullable=False, unique=True, index=True)
+    value_json = db.Column(db.Text, nullable=False, default='{}')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    @property
+    def value(self):
+        try:
+            return json.loads(self.value_json or '{}')
+        except (TypeError, ValueError):
+            return {}
+
+    @value.setter
+    def value(self, value):
+        self.value_json = json.dumps(value or {}, sort_keys=True)
+
+    def to_dict(self, include_secrets=False):
+        value = self.value
+        if not include_secrets:
+            value = {
+                key: ('********' if _is_secret_key(key) and value else value)
+                for key, value in value.items()
+            }
+        return {
+            'id': self.id,
+            'key': self.key,
+            'value': value,
+            'created_at': self.created_at.isoformat(),
+            'updated_at': self.updated_at.isoformat(),
+        }
+
+
+def _is_secret_key(key):
+    return any(part in key.lower() for part in ('secret', 'token'))
 
 
 class SocialPublishHistory(db.Model):

@@ -945,7 +945,7 @@ async function refreshShareYouTubeStatus() {
         if (!status.configured) {
             shareYouTubeStatus.textContent = 'Setup needed';
             shareYouTubeStatus.className = 'status-pill status-inactive';
-            youtubePublishMessage.textContent = 'Set YouTube OAuth keys in .env, then connect YouTube in Company settings.';
+            youtubePublishMessage.textContent = 'Add YouTube app keys in Company settings, then connect YouTube.';
             publishYouTubeBtn.disabled = true;
             return;
         }
@@ -1010,7 +1010,7 @@ async function refreshShareFacebookStatus() {
         if (!status.configured) {
             shareFacebookStatus.textContent = 'Setup needed';
             shareFacebookStatus.className = 'status-pill status-inactive';
-            facebookPublishMessage.textContent = 'Set Facebook app keys in .env, then connect Facebook in Company settings.';
+            facebookPublishMessage.textContent = 'Add Facebook app keys in Company settings, then connect Facebook.';
             publishFacebookBtn.disabled = true;
             return;
         }
@@ -1081,7 +1081,7 @@ async function refreshShareInstagramStatus() {
         if (!status.public_base_url_configured) {
             shareInstagramStatus.textContent = 'Setup needed';
             shareInstagramStatus.className = 'status-pill status-inactive';
-            instagramPublishMessage.textContent = 'Set SOCIAL_PUBLIC_BASE_URL to a public app URL so Instagram can fetch the MP4.';
+            instagramPublishMessage.textContent = 'Add Public base URL in Company settings so Instagram can fetch the MP4.';
             publishInstagramBtn.disabled = true;
             return;
         }
@@ -1145,7 +1145,7 @@ async function refreshShareXStatus() {
         if (!status.configured) {
             shareXStatus.textContent = 'Setup needed';
             shareXStatus.className = 'status-pill status-inactive';
-            xPublishMessage.textContent = 'Set X app keys in .env, then connect X in Company settings.';
+            xPublishMessage.textContent = 'Add X app keys in Company settings, then connect X.';
             publishXBtn.disabled = true;
             return;
         }
@@ -1208,7 +1208,7 @@ async function refreshShareLinkedInStatus() {
         statusEl: shareLinkedInStatus,
         messageEl: linkedinPublishMessage,
         publishBtn: publishLinkedInBtn,
-        setupMessage: 'Set LinkedIn app keys in .env, then connect a LinkedIn Page in Company settings.',
+        setupMessage: 'Add LinkedIn app keys in Company settings, then connect a LinkedIn Page.',
         disconnectedMessage: 'Connect LinkedIn Page in Company settings first.',
         readyMessage: name => name
             ? `Ready to publish to Page ${name}.`
@@ -1222,7 +1222,7 @@ async function refreshShareLinkedInPersonalStatus() {
         statusEl: shareLinkedInPersonalStatus,
         messageEl: linkedinPersonalPublishMessage,
         publishBtn: publishLinkedInPersonalBtn,
-        setupMessage: 'Set LinkedIn app keys in .env, then connect a LinkedIn personal profile in Company settings.',
+        setupMessage: 'Add LinkedIn app keys in Company settings, then connect a LinkedIn personal profile.',
         disconnectedMessage: 'Connect LinkedIn personal profile in Company settings first.',
         readyMessage: name => name
             ? `Ready to publish to ${name}.`

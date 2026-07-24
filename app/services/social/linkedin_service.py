@@ -9,6 +9,7 @@ import requests
 from flask import url_for
 
 from app.models import SocialConnection
+from app.services.social.app_config_service import get_social_app_value
 from wsgi import db
 
 
@@ -39,16 +40,17 @@ class LinkedInPublishError(RuntimeError):
 
 
 def _client_id():
-    return os.getenv('LINKEDIN_CLIENT_ID', '').strip()
+    return get_social_app_value('linkedin', 'client_id', 'LINKEDIN_CLIENT_ID')
 
 
 def _client_secret():
-    return os.getenv('LINKEDIN_CLIENT_SECRET', '').strip()
+    return get_social_app_value('linkedin', 'client_secret', 'LINKEDIN_CLIENT_SECRET')
 
 
 def _scopes(target):
+    key = 'personal_scopes' if target == 'personal' else 'page_scopes'
     env_key = 'LINKEDIN_PERSONAL_SCOPES' if target == 'personal' else 'LINKEDIN_PAGE_SCOPES'
-    configured = os.getenv(env_key, '').strip().strip('"').strip("'")
+    configured = get_social_app_value('linkedin', key, env_key).strip('"').strip("'")
     if not configured and target == 'page':
         configured = os.getenv('LINKEDIN_SCOPES', '').strip().strip('"').strip("'")
     if configured:
@@ -63,7 +65,7 @@ def _scopes(target):
 
 
 def _prompt():
-    return os.getenv('LINKEDIN_PROMPT', 'login').strip()
+    return get_social_app_value('linkedin', 'prompt', 'LINKEDIN_PROMPT', 'login')
 
 
 def _normalize_target(target):
@@ -88,7 +90,7 @@ def linkedin_publish_target():
 
 
 def linkedin_redirect_uri():
-    configured = os.getenv('LINKEDIN_REDIRECT_URI', '').strip()
+    configured = get_social_app_value('linkedin', 'redirect_uri', 'LINKEDIN_REDIRECT_URI')
     if configured:
         return configured
     return url_for('social.linkedin_callback', _external=True)

@@ -12,6 +12,7 @@ import requests
 from flask import url_for
 
 from app.models import SocialConnection
+from app.services.social.app_config_service import get_social_app_value
 from wsgi import db
 
 
@@ -36,15 +37,15 @@ class XPublishError(RuntimeError):
 
 
 def _client_id():
-    return os.getenv('X_CLIENT_ID', '').strip()
+    return get_social_app_value(X_PROVIDER, 'client_id', 'X_CLIENT_ID')
 
 
 def _client_secret():
-    return os.getenv('X_CLIENT_SECRET', '').strip()
+    return get_social_app_value(X_PROVIDER, 'client_secret', 'X_CLIENT_SECRET')
 
 
 def _scopes():
-    configured = os.getenv('X_SCOPES', '').strip().strip('"').strip("'")
+    configured = get_social_app_value(X_PROVIDER, 'scopes', 'X_SCOPES').strip('"').strip("'")
     if configured:
         return tuple(
             scope.strip().strip('"').strip("'")
@@ -59,7 +60,7 @@ def x_config_ready():
 
 
 def x_redirect_uri():
-    configured = os.getenv('X_REDIRECT_URI', '').strip()
+    configured = get_social_app_value(X_PROVIDER, 'redirect_uri', 'X_REDIRECT_URI')
     if configured:
         return configured
     return url_for('social.x_callback', _external=True)
@@ -237,7 +238,12 @@ def upload_video_media(token, path):
         json={
             'media_type': 'video/mp4',
             'total_bytes': size,
-            'media_category': os.getenv('X_MEDIA_CATEGORY', 'tweet_video').strip() or 'tweet_video',
+            'media_category': get_social_app_value(
+                X_PROVIDER,
+                'media_category',
+                'X_MEDIA_CATEGORY',
+                'tweet_video',
+            ) or 'tweet_video',
         },
         timeout=30,
     )

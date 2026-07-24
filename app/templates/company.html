@@ -101,6 +101,148 @@
         </div>
     </section>
 
+    {#
+    <section class="card">
+        <div class="card-header-row">
+            <h2>Social App Keys</h2>
+            <span class="text-muted">System-wide</span>
+        </div>
+        <div class="social-app-config-grid">
+            <div class="social-app-config-item">
+                <div class="social-app-config-header">
+                    <span class="social-platform-mark social-youtube">YT</span>
+                    <h3>YouTube</h3>
+                </div>
+                <div class="social-app-config-fields">
+                    <div class="form-group">
+                        <label for="youtubeClientId">Client ID</label>
+                        <input type="text" id="youtubeClientId" class="input" data-social-config-field data-provider="youtube" data-key="client_id">
+                    </div>
+                    <div class="form-group">
+                        <label for="youtubeClientSecret">Client secret</label>
+                        <input type="password" id="youtubeClientSecret" class="input" data-social-config-field data-provider="youtube" data-key="client_secret" autocomplete="new-password">
+                    </div>
+                    <div class="form-group">
+                        <label for="youtubeRedirectUri">Redirect URI</label>
+                        <input type="url" id="youtubeRedirectUri" class="input" data-social-config-field data-provider="youtube" data-key="redirect_uri">
+                    </div>
+                </div>
+                <div class="social-app-config-actions">
+                    <button type="button" class="btn btn-secondary btn-compact save-social-app-config-btn" data-provider="youtube">Save YouTube Keys</button>
+                </div>
+            </div>
+
+            <div class="social-app-config-item">
+                <div class="social-app-config-header">
+                    <span class="social-platform-mark social-facebook">f</span>
+                    <h3>Facebook & Instagram</h3>
+                </div>
+                <div class="social-app-config-fields">
+                    <div class="form-group">
+                        <label for="facebookAppId">App ID</label>
+                        <input type="text" id="facebookAppId" class="input" data-social-config-field data-provider="facebook" data-key="app_id">
+                    </div>
+                    <div class="form-group">
+                        <label for="facebookAppSecret">App secret</label>
+                        <input type="password" id="facebookAppSecret" class="input" data-social-config-field data-provider="facebook" data-key="app_secret" autocomplete="new-password">
+                    </div>
+                    <div class="form-group">
+                        <label for="facebookRedirectUri">Redirect URI</label>
+                        <input type="url" id="facebookRedirectUri" class="input" data-social-config-field data-provider="facebook" data-key="redirect_uri">
+                    </div>
+                    <div class="form-group">
+                        <label for="facebookGraphVersion">Graph version</label>
+                        <input type="text" id="facebookGraphVersion" class="input" data-social-config-field data-provider="facebook" data-key="graph_version" placeholder="v23.0">
+                    </div>
+                    <div class="form-group">
+                        <label for="facebookLoginConfigId">Login config ID</label>
+                        <input type="text" id="facebookLoginConfigId" class="input" data-social-config-field data-provider="facebook" data-key="login_config_id">
+                    </div>
+                    <div class="form-group">
+                        <label for="facebookPublicBaseUrl">Public base URL</label>
+                        <input type="url" id="facebookPublicBaseUrl" class="input" data-social-config-field data-provider="facebook" data-key="public_base_url">
+                    </div>
+                    <div class="form-group form-group-wide">
+                        <label for="facebookScopes">Scopes</label>
+                        <input type="text" id="facebookScopes" class="input" data-social-config-field data-provider="facebook" data-key="scopes">
+                    </div>
+                </div>
+                <div class="social-app-config-actions">
+                    <button type="button" class="btn btn-secondary btn-compact save-social-app-config-btn" data-provider="facebook">Save Facebook Keys</button>
+                </div>
+            </div>
+
+            <div class="social-app-config-item">
+                <div class="social-app-config-header">
+                    <span class="social-platform-mark social-x">X</span>
+                    <h3>X</h3>
+                </div>
+                <div class="social-app-config-fields">
+                    <div class="form-group">
+                        <label for="xClientId">Client ID</label>
+                        <input type="text" id="xClientId" class="input" data-social-config-field data-provider="x" data-key="client_id">
+                    </div>
+                    <div class="form-group">
+                        <label for="xClientSecret">Client secret</label>
+                        <input type="password" id="xClientSecret" class="input" data-social-config-field data-provider="x" data-key="client_secret" autocomplete="new-password">
+                    </div>
+                    <div class="form-group">
+                        <label for="xRedirectUri">Redirect URI</label>
+                        <input type="url" id="xRedirectUri" class="input" data-social-config-field data-provider="x" data-key="redirect_uri">
+                    </div>
+                    <div class="form-group">
+                        <label for="xMediaCategory">Media category</label>
+                        <input type="text" id="xMediaCategory" class="input" data-social-config-field data-provider="x" data-key="media_category" placeholder="tweet_video">
+                    </div>
+                    <div class="form-group form-group-wide">
+                        <label for="xScopes">Scopes</label>
+                        <input type="text" id="xScopes" class="input" data-social-config-field data-provider="x" data-key="scopes">
+                    </div>
+                </div>
+                <div class="social-app-config-actions">
+                    <button type="button" class="btn btn-secondary btn-compact save-social-app-config-btn" data-provider="x">Save X Keys</button>
+                </div>
+            </div>
+
+            <div class="social-app-config-item">
+                <div class="social-app-config-header">
+                    <span class="social-platform-mark social-linkedin">in</span>
+                    <h3>LinkedIn</h3>
+                </div>
+                <div class="social-app-config-fields">
+                    <div class="form-group">
+                        <label for="linkedinClientId">Client ID</label>
+                        <input type="text" id="linkedinClientId" class="input" data-social-config-field data-provider="linkedin" data-key="client_id">
+                    </div>
+                    <div class="form-group">
+                        <label for="linkedinClientSecret">Client secret</label>
+                        <input type="password" id="linkedinClientSecret" class="input" data-social-config-field data-provider="linkedin" data-key="client_secret" autocomplete="new-password">
+                    </div>
+                    <div class="form-group">
+                        <label for="linkedinRedirectUri">Redirect URI</label>
+                        <input type="url" id="linkedinRedirectUri" class="input" data-social-config-field data-provider="linkedin" data-key="redirect_uri">
+                    </div>
+                    <div class="form-group">
+                        <label for="linkedinPrompt">Prompt</label>
+                        <input type="text" id="linkedinPrompt" class="input" data-social-config-field data-provider="linkedin" data-key="prompt" placeholder="login">
+                    </div>
+                    <div class="form-group">
+                        <label for="linkedinPersonalScopes">Personal scopes</label>
+                        <input type="text" id="linkedinPersonalScopes" class="input" data-social-config-field data-provider="linkedin" data-key="personal_scopes">
+                    </div>
+                    <div class="form-group">
+                        <label for="linkedinPageScopes">Page scopes</label>
+                        <input type="text" id="linkedinPageScopes" class="input" data-social-config-field data-provider="linkedin" data-key="page_scopes">
+                    </div>
+                </div>
+                <div class="social-app-config-actions">
+                    <button type="button" class="btn btn-secondary btn-compact save-social-app-config-btn" data-provider="linkedin">Save LinkedIn Keys</button>
+                </div>
+            </div>
+        </div>
+    </section>
+    #}
+
     <section class="card">
         <div class="card-header-row">
             <h2>Social Connections</h2>

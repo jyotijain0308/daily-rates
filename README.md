@@ -41,6 +41,7 @@ A Python-based system that imports product rates, manages company-specific produ
 **Social Publishing**
 - Connected social platform status on the dashboard
 - Publishing integrations for YouTube, Facebook Page, Instagram Reels, LinkedIn, and X
+- Social app keys are managed system-wide in the database from **Company → Social App Keys**
 - Manual social options were removed; publishing flows use configured integrations
 
 **Exchange Rate Integration**
@@ -233,6 +234,17 @@ To update rates in bulk, open **Products**, click **Export Rate Sheet**, update 
 Generated web files are saved to `uploads/generated/`, for example `uploads/generated/videos/india_products_price_list_20260627_154030.mp4`.
 
 On app startup, generated `.pptx` and `.mp4` files from previous days are automatically deleted from `uploads/generated/`. Files generated today are kept.
+
+### Social App Keys
+
+Social publishing app credentials are now stored system-wide in PostgreSQL. Open **Company → Social App Keys** and add keys for the platforms you use:
+
+- **YouTube:** Client ID, Client secret, Redirect URI
+- **Facebook & Instagram:** App ID, App secret, Redirect URI, Graph version, Login config ID, Scopes, Public base URL
+- **X:** Client ID, Client secret, Redirect URI, Scopes, Media category
+- **LinkedIn:** Client ID, Client secret, Redirect URI, Personal scopes, Page scopes, Prompt
+
+The matching `.env` values are still supported as fallback/bootstrap values. If both are present, the system configuration value from the database is used first.
 
 ### Dashboard Layout
 

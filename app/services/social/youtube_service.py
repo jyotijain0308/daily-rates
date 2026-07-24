@@ -9,6 +9,7 @@ import requests
 from flask import current_app, url_for
 
 from app.models import SocialConnection
+from app.services.social.app_config_service import get_social_app_value
 from wsgi import db
 
 
@@ -30,11 +31,11 @@ class YouTubePublishError(RuntimeError):
 
 
 def _client_id():
-    return os.getenv('YOUTUBE_CLIENT_ID', '').strip()
+    return get_social_app_value(YOUTUBE_PROVIDER, 'client_id', 'YOUTUBE_CLIENT_ID')
 
 
 def _client_secret():
-    return os.getenv('YOUTUBE_CLIENT_SECRET', '').strip()
+    return get_social_app_value(YOUTUBE_PROVIDER, 'client_secret', 'YOUTUBE_CLIENT_SECRET')
 
 
 def youtube_config_ready():
@@ -42,7 +43,7 @@ def youtube_config_ready():
 
 
 def youtube_redirect_uri():
-    configured = os.getenv('YOUTUBE_REDIRECT_URI', '').strip()
+    configured = get_social_app_value(YOUTUBE_PROVIDER, 'redirect_uri', 'YOUTUBE_REDIRECT_URI')
     if configured:
         return configured
     return url_for('social.youtube_callback', _external=True)

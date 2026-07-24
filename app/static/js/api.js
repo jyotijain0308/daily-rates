@@ -62,6 +62,17 @@ const API = {
         });
     },
 
+    getSocialAppConfigs() {
+        return this.request('/api/system/social-app-configs');
+    },
+
+    updateSocialAppConfig(provider, settings) {
+        return this.request(`/api/system/social-app-configs/${encodeURIComponent(provider)}`, {
+            method: 'PUT',
+            body: JSON.stringify({ settings }),
+        });
+    },
+
     createCountry(country) {
         return this.request('/api/countries/', {
             method: 'POST',

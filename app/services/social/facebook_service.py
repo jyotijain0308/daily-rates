@@ -11,6 +11,7 @@ import requests
 from flask import url_for
 
 from app.models import SocialConnection
+from app.services.social.app_config_service import get_social_app_value
 from wsgi import db
 
 
@@ -40,23 +41,23 @@ class FacebookPublishError(RuntimeError):
 
 
 def _app_id():
-    return os.getenv('FACEBOOK_APP_ID', '').strip()
+    return get_social_app_value(FACEBOOK_PROVIDER, 'app_id', 'FACEBOOK_APP_ID')
 
 
 def _app_secret():
-    return os.getenv('FACEBOOK_APP_SECRET', '').strip()
+    return get_social_app_value(FACEBOOK_PROVIDER, 'app_secret', 'FACEBOOK_APP_SECRET')
 
 
 def _graph_version():
-    return (os.getenv('FACEBOOK_GRAPH_VERSION', '').strip() or 'v23.0').lstrip('/')
+    return (get_social_app_value(FACEBOOK_PROVIDER, 'graph_version', 'FACEBOOK_GRAPH_VERSION', 'v23.0') or 'v23.0').lstrip('/')
 
 
 def _login_config_id():
-    return os.getenv('FACEBOOK_LOGIN_CONFIG_ID', '').strip()
+    return get_social_app_value(FACEBOOK_PROVIDER, 'login_config_id', 'FACEBOOK_LOGIN_CONFIG_ID')
 
 
 def _scopes():
-    configured = os.getenv('FACEBOOK_SCOPES', '').strip()
+    configured = get_social_app_value(FACEBOOK_PROVIDER, 'scopes', 'FACEBOOK_SCOPES')
     if configured:
         return tuple(scope.strip() for scope in configured.split(',') if scope.strip())
     return FACEBOOK_SCOPES
@@ -67,7 +68,7 @@ def facebook_config_ready():
 
 
 def facebook_redirect_uri():
-    configured = os.getenv('FACEBOOK_REDIRECT_URI', '').strip()
+    configured = get_social_app_value(FACEBOOK_PROVIDER, 'redirect_uri', 'FACEBOOK_REDIRECT_URI')
     if configured:
         return configured
     return url_for('social.facebook_callback', _external=True)
@@ -355,7 +356,9 @@ def get_connected_instagram_account(connection):
 def upload_instagram_reel(connection, video_url, caption):
     """Publish an MP4 as an Instagram Reel through the linked Instagram account."""
     if not video_url:
-        raise FacebookPublishError('Set SOCIAL_PUBLIC_BASE_URL so Instagram can fetch the generated MP4.')
+        raise FacebookPublishError(
+            'Set Public base URL in Social App Keys or SOCIAL_PUBLIC_BASE_URL so Instagram can fetch the generated MP4.'
+        )
     account = get_connected_instagram_account(connection)
     if not account:
         raise FacebookPublishError('No Instagram professional account is connected to the Facebook Page.')

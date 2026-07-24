@@ -26,6 +26,8 @@ const linkedinPageStatus = document.getElementById('linkedinPageStatus');
 const linkedinPageConnectionMessage = document.getElementById('linkedinPageConnectionMessage');
 const connectLinkedInPageBtn = document.getElementById('connectLinkedInPageBtn');
 const disconnectLinkedInPageBtn = document.getElementById('disconnectLinkedInPageBtn');
+const socialAppConfigFields = Array.from(document.querySelectorAll('[data-social-config-field]'));
+const saveSocialAppConfigBtns = Array.from(document.querySelectorAll('.save-social-app-config-btn'));
 
 const fields = {
     name: document.getElementById('companyName'),
@@ -82,6 +84,9 @@ connectLinkedInPersonalBtn.addEventListener('click', connectLinkedInPersonal);
 disconnectLinkedInPersonalBtn.addEventListener('click', disconnectLinkedInPersonal);
 connectLinkedInPageBtn.addEventListener('click', connectLinkedInPage);
 disconnectLinkedInPageBtn.addEventListener('click', disconnectLinkedInPage);
+saveSocialAppConfigBtns.forEach(button => {
+    button.addEventListener('click', () => saveSocialAppConfig(button.dataset.provider, button));
+});
 Object.keys(assetBrowseButtons).forEach(field => {
     assetBrowseButtons[field].addEventListener('click', () => assetInputs[field].click());
     assetInputs[field].addEventListener('change', event => handleAssetSelected(field, event));
@@ -105,6 +110,9 @@ async function loadCompany() {
         companyStatus.className = 'status-pill status-inactive';
     } finally {
         setLoading(false);
+    }
+    if (socialAppConfigFields.length) {
+        await loadSocialAppConfigs();
     }
     await loadYouTubeStatus();
     await loadFacebookStatus();
@@ -202,9 +210,63 @@ function setLoading(isLoading) {
     disconnectLinkedInPersonalBtn.disabled = isLoading;
     connectLinkedInPageBtn.disabled = isLoading;
     disconnectLinkedInPageBtn.disabled = isLoading;
+    saveSocialAppConfigBtns.forEach(button => {
+        button.disabled = isLoading;
+    });
     Object.values(assetBrowseButtons).forEach(button => {
         button.disabled = isLoading;
     });
+}
+
+async function loadSocialAppConfigs() {
+    if (!socialAppConfigFields.length) return;
+
+    try {
+        const result = await API.getSocialAppConfigs();
+        const configs = result.data || {};
+        socialAppConfigFields.forEach(field => {
+            const provider = field.dataset.provider;
+            const key = field.dataset.key;
+            field.value = configs[provider]?.settings?.[key] || '';
+        });
+    } catch (err) {
+        showError(err.message);
+    }
+}
+
+async function saveSocialAppConfig(provider, button) {
+    if (!provider) {
+        showError('Social provider could not be detected');
+        return;
+    }
+
+    const settings = {};
+    socialAppConfigFields
+        .filter(field => field.dataset.provider === provider)
+        .forEach(field => {
+            settings[field.dataset.key] = field.value.trim();
+        });
+
+    button.disabled = true;
+    try {
+        await API.updateSocialAppConfig(provider, settings);
+        showSuccess('Social app keys saved');
+        await loadSocialAppConfigs();
+        await refreshSocialStatuses();
+    } catch (err) {
+        showError(err.message);
+    } finally {
+        button.disabled = false;
+    }
+}
+
+async function refreshSocialStatuses() {
+    await loadYouTubeStatus();
+    await loadFacebookStatus();
+    await loadInstagramStatus();
+    await loadXStatus();
+    await loadLinkedInPersonalStatus();
+    await loadLinkedInPageStatus();
 }
 
 async function loadYouTubeStatus() {
@@ -214,7 +276,7 @@ async function loadYouTubeStatus() {
         if (!status.configured) {
             youtubeStatus.textContent = 'Setup needed';
             youtubeStatus.className = 'status-pill status-inactive';
-            youtubeConnectionMessage.textContent = 'Set YOUTUBE_CLIENT_ID and YOUTUBE_CLIENT_SECRET in .env before connecting.';
+            youtubeConnectionMessage.textContent = 'Add YouTube app keys in Social App Keys before connecting.';
             connectYouTubeBtn.style.display = 'inline-flex';
             disconnectYouTubeBtn.style.display = 'none';
             return;
@@ -270,7 +332,7 @@ async function loadFacebookStatus() {
         if (!status.configured) {
             facebookStatus.textContent = 'Setup needed';
             facebookStatus.className = 'status-pill status-inactive';
-            facebookConnectionMessage.textContent = 'Set FACEBOOK_APP_ID and FACEBOOK_APP_SECRET in .env before connecting.';
+            facebookConnectionMessage.textContent = 'Add Facebook app keys in Social App Keys before connecting.';
             connectFacebookBtn.style.display = 'inline-flex';
             disconnectFacebookBtn.style.display = 'none';
             return;
@@ -317,7 +379,7 @@ async function loadInstagramStatus() {
         if (!status.public_base_url_configured) {
             instagramStatus.textContent = 'Setup needed';
             instagramStatus.className = 'status-pill status-inactive';
-            instagramConnectionMessage.textContent = 'Set SOCIAL_PUBLIC_BASE_URL to publish MP4 videos to Instagram.';
+            instagramConnectionMessage.textContent = 'Add Public base URL in Social App Keys to publish MP4 videos to Instagram.';
             return;
         }
 
@@ -362,7 +424,7 @@ async function loadXStatus() {
         if (!status.configured) {
             xStatus.textContent = 'Setup needed';
             xStatus.className = 'status-pill status-inactive';
-            xConnectionMessage.textContent = 'Set X_CLIENT_ID in .env before connecting. Add X_CLIENT_SECRET for confidential apps.';
+            xConnectionMessage.textContent = 'Add X app keys in Social App Keys before connecting.';
             connectXBtn.style.display = 'inline-flex';
             disconnectXBtn.style.display = 'none';
             return;
@@ -442,7 +504,7 @@ async function loadLinkedInTargetStatus(options) {
         if (!status.configured) {
             options.statusEl.textContent = 'Setup needed';
             options.statusEl.className = 'status-pill status-inactive';
-            options.messageEl.textContent = 'Set LINKEDIN_CLIENT_ID and LINKEDIN_CLIENT_SECRET in .env before connecting.';
+            options.messageEl.textContent = 'Add LinkedIn app keys in Social App Keys before connecting.';
             options.connectBtn.style.display = 'inline-flex';
             options.disconnectBtn.style.display = 'none';
             return;

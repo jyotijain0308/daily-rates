@@ -23,6 +23,7 @@ from app.services.social.facebook_service import (
     upload_instagram_reel,
     upload_page_video,
 )
+from app.services.social.app_config_service import get_social_app_value
 from app.services.social.linkedin_service import (
     LinkedInConfigError,
     LinkedInPublishError,
@@ -117,7 +118,7 @@ def _facebook_status_payload(company_id):
 
 def _social_public_base_url():
     return (
-        os.getenv('SOCIAL_PUBLIC_BASE_URL')
+        get_social_app_value('facebook', 'public_base_url', 'SOCIAL_PUBLIC_BASE_URL')
         or os.getenv('APP_PUBLIC_BASE_URL')
         or ''
     ).strip().rstrip('/')
@@ -165,7 +166,7 @@ def _public_mp4_url(filename):
 
 def _validate_public_mp4_url(video_url):
     if not video_url:
-        return 'Set SOCIAL_PUBLIC_BASE_URL so Instagram can fetch the generated MP4.'
+        return 'Set Public base URL in Social App Keys or SOCIAL_PUBLIC_BASE_URL so Instagram can fetch the generated MP4.'
 
     try:
         response = requests.get(
@@ -189,16 +190,16 @@ def _validate_public_mp4_url(video_url):
         if ngrok_error:
             return (
                 f'Public MP4 URL returned HTTP {response.status_code} from ngrok ({ngrok_error}). '
-                f'Start/restart ngrok against this Flask app port and update SOCIAL_PUBLIC_BASE_URL: {video_url}'
+                f'Start/restart ngrok against this Flask app port and update Public base URL in Social App Keys or SOCIAL_PUBLIC_BASE_URL: {video_url}'
             )
         return (
             f'Public MP4 URL returned HTTP {response.status_code} from {server}. '
-            f'Check SOCIAL_PUBLIC_BASE_URL and make sure it points to this Flask app: {video_url}'
+            f'Check Public base URL in Social App Keys or SOCIAL_PUBLIC_BASE_URL and make sure it points to this Flask app: {video_url}'
         )
     if content_type != 'video/mp4':
         return (
             f'Public MP4 URL returned Content-Type "{content_type or "missing"}" instead of video/mp4. '
-            f'Check SOCIAL_PUBLIC_BASE_URL and make sure Meta can download the MP4 directly: {video_url}'
+            f'Check Public base URL in Social App Keys or SOCIAL_PUBLIC_BASE_URL and make sure Meta can download the MP4 directly: {video_url}'
         )
     return ''
 
