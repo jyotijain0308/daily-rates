@@ -207,8 +207,13 @@ jobs:
           print(f"Using Python {sys.version.split()[0]}")
           PY
 
+          if [ -d .venv ] && ! .venv/bin/python -c 'import sys; print(sys.version)' >/dev/null 2>&1; then
+            echo "Existing virtualenv is unusable; recreating it."
+            rm -rf .venv
+          fi
+
           if [ ! -x .venv/bin/python ]; then
-            "$PYTHON_BIN" -m venv .venv
+            "$PYTHON_BIN" -m venv --copies .venv
           fi
 
           .venv/bin/python -m pip install --upgrade pip
