@@ -290,10 +290,10 @@ Or use the included `Procfile` with Heroku or similar platforms.
 ### Render Deployment
 
 Production now runs on Render as a Python web service. The included `render.yaml`
-pins Python 3.12.8 and uses Gunicorn:
+pins Python 3.12.8, runs database migrations, and starts Gunicorn:
 
 ```bash
-gunicorn "wsgi:create_app()" --bind 0.0.0.0:$PORT --workers 2
+flask --app "wsgi:create_app" db upgrade && gunicorn "wsgi:create_app()" --bind 0.0.0.0:$PORT --workers 2
 ```
 
 Set these environment variables in the Render service:
@@ -305,13 +305,6 @@ Set these environment variables in the Render service:
 
 Do not set `APP_BASE_PATH` for the Render subdomain. That setting is only for
 hosting the app under a path such as `/taaza-rates`.
-
-Run migrations from Render Shell after the first deploy, or before deploying a
-schema-changing release:
-
-```bash
-flask --app "wsgi:create_app" db upgrade
-```
 
 Render Free service storage is ephemeral. Runtime files in `uploads/`, `output/`,
 and cache directories can disappear on restart or deploy; use persistent object

@@ -895,6 +895,16 @@ class TestPPTDailyRatesAPI(unittest.TestCase):
         self.assertIn('Air', data['shipments'])
         self.assertEqual(data['currency'], 'AED')
 
+    def test_product_stats_route_handles_empty_catalog(self):
+        response = self.client.get('/api/products/stats')
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()['data']
+        self.assertEqual(data['total_products'], 0)
+        self.assertEqual(data['products_missing_images'], 0)
+        self.assertEqual(data['missing_image_products'], [])
+        self.assertEqual(data['countries'], {})
+        self.assertEqual(data['shipments'], {})
+
     def test_country_management_crud_and_active_dropdown(self):
         create_response = self.client.post('/api/countries/', json={
             'name': 'Peru',
