@@ -182,8 +182,10 @@ jobs:
           set -euo pipefail
 
           cd "$CPANEL_APP_DIR"
+          USE_MANAGED_PYTHON=false
           if [ -n "${CPANEL_PYTHON:-}" ]; then
             PYTHON_BIN="$CPANEL_PYTHON"
+            USE_MANAGED_PYTHON=true
           else
             PYTHON_BIN=""
             for candidate in python3.12 python3.11 python3.10 python3.9 python3 python; do
@@ -207,20 +209,25 @@ jobs:
           print(f"Using Python {sys.version.split()[0]}")
           PY
 
-          if [ -d .venv ] && ! .venv/bin/python -c 'import sys; print(sys.version)' >/dev/null 2>&1; then
-            echo "Existing virtualenv is unusable; recreating it."
-            rm -rf .venv
+          if [ "$USE_MANAGED_PYTHON" = true ]; then
+            APP_PYTHON="$PYTHON_BIN"
+          else
+            if [ -d .venv ] && ! .venv/bin/python -c 'import sys; print(sys.version)' >/dev/null 2>&1; then
+              echo "Existing virtualenv is unusable; recreating it."
+              rm -rf .venv
+            fi
+
+            if [ ! -x .venv/bin/python ]; then
+              "$PYTHON_BIN" -m venv --copies .venv
+            fi
+            APP_PYTHON=".venv/bin/python"
           fi
 
-          if [ ! -x .venv/bin/python ]; then
-            "$PYTHON_BIN" -m venv --copies .venv
-          fi
+          "$APP_PYTHON" -m pip install --upgrade pip
+          "$APP_PYTHON" -m pip install -r requirements.txt
 
-          .venv/bin/python -m pip install --upgrade pip
-          .venv/bin/python -m pip install -r requirements.txt
-
-          .venv/bin/flask --app 'wsgi:create_app' db upgrade
-          .venv/bin/python - <<'PY'
+          "$APP_PYTHON" -m flask --app 'wsgi:create_app' db upgrade
+          "$APP_PYTHON" - <<'PY'
           import json
           from wsgi import create_app
 

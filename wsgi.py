@@ -10,6 +10,7 @@ from flask import Flask, jsonify, redirect, request, url_for
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 from sqlalchemy import inspect, text
+from urllib.parse import urlparse
 
 try:
     from flask_migrate import Migrate
@@ -21,6 +22,24 @@ db = SQLAlchemy()
 migrate = Migrate() if Migrate else None
 
 logger = logging.getLogger(__name__)
+
+
+class PrefixMiddleware:
+    """Support hosting the Flask app under a URL prefix such as /taaza-rates."""
+
+    def __init__(self, app, prefix):
+        self.app = app
+        self.prefix = (prefix or '').rstrip('/')
+
+    def __call__(self, environ, start_response):
+        if self.prefix:
+            path_info = environ.get('PATH_INFO', '')
+            environ['SCRIPT_NAME'] = self.prefix
+            if path_info == self.prefix:
+                environ['PATH_INFO'] = '/'
+            elif path_info.startswith(f'{self.prefix}/'):
+                environ['PATH_INFO'] = path_info[len(self.prefix):] or '/'
+        return self.app(environ, start_response)
 
 
 def running_in_docker() -> bool:
@@ -69,6 +88,19 @@ def get_database_uri() -> str:
         return database_url.replace('mysql://', 'mysql+pymysql://', 1)
 
     return database_url
+
+
+def get_app_base_path() -> str:
+    """Return the optional URL path where the app is mounted."""
+    explicit_path = (os.getenv('APP_BASE_PATH') or '').strip()
+    if explicit_path:
+        return '/' + explicit_path.strip('/')
+
+    app_url = (os.getenv('APP_URL') or '').strip()
+    if app_url:
+        return urlparse(app_url).path.rstrip('/')
+
+    return ''
 
 
 def ensure_database_schema():
@@ -165,6 +197,8 @@ def create_app(config=None):
     app.config['GENERATION_AUDIO_DIR'] = 'uploads/audio'
     app.config['SECRET_KEY'] = os.getenv('SECRET_KEY') or os.getenv('FLASK_SECRET_KEY') or 'dev-change-me'
     app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=14)
+    app.config['APP_BASE_PATH'] = get_app_base_path()
+    app.wsgi_app = PrefixMiddleware(app.wsgi_app, app.config['APP_BASE_PATH'])
     
     # Override with custom config if provided
     if config:

@@ -9,7 +9,7 @@
         <p class="subtitle">Upload a CSV file, preview the data, then save to the database</p>
     </div>
     <div class="page-header-actions">
-        <a href="/api/import/sample" class="btn btn-primary" id="downloadSampleBtn" download>Download Sample CSV</a>
+        <a href="{{ url_for('imports.download_sample_csv') }}" class="btn btn-primary" id="downloadSampleBtn" download>Download Sample CSV</a>
         <button type="button" class="btn btn-secondary" id="downloadTemplateBtn">Blank Template</button>
     </div>
 </section>

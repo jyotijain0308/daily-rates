@@ -90,7 +90,7 @@ function renderProducts() {
     if (showMissingImagesOnly) {
         productCount.innerHTML = `
             ${filtered.length} product${filtered.length !== 1 ? 's' : ''} without images
-            <a href="/products" class="inline-link">Clear filter</a>
+            <a href="${API.url('/products')}" class="inline-link">Clear filter</a>
         `;
     } else {
         productCount.textContent = `${filtered.length} product${filtered.length !== 1 ? 's' : ''}`;

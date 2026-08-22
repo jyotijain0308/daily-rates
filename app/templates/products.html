@@ -9,7 +9,7 @@
         <p class="subtitle">View and edit product rates inline</p>
     </div>
     <div class="page-header-actions">
-        <a class="btn btn-secondary" href="/api/products/export">Export Rate Sheet</a>
+        <a class="btn btn-secondary" href="{{ url_for('products.export_products') }}">Export Rate Sheet</a>
         <button type="button" class="btn btn-primary" id="addProductBtn">+ Add Product</button>
     </div>
 </section>

@@ -21,17 +21,17 @@
 <section class="card">
     <h2>Quick Actions</h2>
     <div class="action-grid">
-        <a href="/import" class="action-card">
+        <a href="{{ url_for('pages.import_page') }}" class="action-card">
             <span class="action-icon">📥</span>
             <h3>Import CSV</h3>
             <p>Upload product rates from a CSV file</p>
         </a>
-        <a href="/products" class="action-card">
+        <a href="{{ url_for('pages.products_page') }}" class="action-card">
             <span class="action-icon">✏️</span>
             <h3>Manage Products</h3>
             <p>View and edit rates inline</p>
         </a>
-        <a href="/generate" class="action-card" id="generateAction">
+        <a href="{{ url_for('pages.generate_page') }}" class="action-card" id="generateAction">
             <span class="action-icon">🎯</span>
             <h3>Generate MP4</h3>
             <p id="generateActionHint">Create your video</p>

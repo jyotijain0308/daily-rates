@@ -126,7 +126,7 @@ function renderSocialConnectionsCard(platforms, total) {
                 <h2>Social Media Connections</h2>
                 <p class="subtitle">${total} connected channel${total !== 1 ? 's' : ''} available for MP4 publishing.</p>
             </div>
-            <a class="btn btn-secondary btn-sm" href="/company">Manage</a>
+            <a class="btn btn-secondary btn-sm" href="${API.url('/company')}">Manage</a>
         </div>
         <div class="social-platform-grid">
             ${allPlatforms.map(platform => {
@@ -200,7 +200,7 @@ function renderActiveJobsCard(jobs, total) {
                 <h2>Pending/Running Jobs</h2>
                 <p class="subtitle">${total} active job${total !== 1 ? 's' : ''}.</p>
             </div>
-            <a class="btn btn-secondary btn-sm" href="/generate">Open Generator</a>
+            <a class="btn btn-secondary btn-sm" href="${API.url('/generate')}">Open Generator</a>
         </div>
         <div class="table-wrap">
             <table class="data-table compact-data-table">
@@ -247,7 +247,7 @@ function renderUpdatedProductsCard(products, total, largeRateChanges, largeProdu
                 <h2>Products Updated Today</h2>
                 <p class="subtitle">Today&apos;s products stats summary.</p>
             </div>
-            <a class="btn btn-secondary btn-sm" href="/products">View Products</a>
+            <a class="btn btn-secondary btn-sm" href="${API.url('/products')}">View Products</a>
         </div>
         ${renderUpdatedProductsSummary(rateSummary, total)}
     `;

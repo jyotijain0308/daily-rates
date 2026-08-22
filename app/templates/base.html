@@ -13,9 +13,9 @@
     <div class="app-shell">
         <header class="topbar">
             <div class="topbar-inner">
-                <a href="/" class="brand">
+                <a href="{{ url_for('pages.dashboard') }}" class="brand">
                     <span class="brand-icon">
-                        <img src="../static/images/favicon.png" alt="Taaza Rates" width="80px" style="margin-top: 7px" />
+                        <img src="{{ url_for('static', filename='images/favicon.png') }}" alt="Taaza Rates" width="80px" style="margin-top: 7px" />
                     </span>
                     <span class="brand-copy">
                         <span class="brand-text">Taaza Rates</span>
@@ -25,15 +25,15 @@
                 {% if current_user %}
                     <button class="nav-toggle" id="navToggle" aria-label="Toggle navigation">☰</button>
                     <nav class="main-nav" id="mainNav">
-                        <a href="/" class="nav-link {% if active_page == 'dashboard' %}active{% endif %}">Dashboard</a>
-                        <a href="/import" class="nav-link {% if active_page == 'import' %}active{% endif %}">Import</a>
+                        <a href="{{ url_for('pages.dashboard') }}" class="nav-link {% if active_page == 'dashboard' %}active{% endif %}">Dashboard</a>
+                        <a href="{{ url_for('pages.import_page') }}" class="nav-link {% if active_page == 'import' %}active{% endif %}">Import</a>
                         {# PDF import is intentionally disabled.
-                        <a href="/import-pdf" class="nav-link {% if active_page == 'import_pdf' %}active{% endif %}">PDF Import</a>
+                        <a href="{{ url_for('pages.import_pdf_page_disabled') }}" class="nav-link {% if active_page == 'import_pdf' %}active{% endif %}">PDF Import</a>
                         #}
-                        <a href="/products" class="nav-link {% if active_page == 'products' %}active{% endif %}">Products</a>
-                        <a href="/countries" class="nav-link {% if active_page == 'countries' %}active{% endif %}">Countries</a>
-                        <a href="/company" class="nav-link {% if active_page == 'company' %}active{% endif %}">Company</a>
-                        <a href="/generate" class="nav-link {% if active_page == 'generate' %}active{% endif %}">Generate</a>
+                        <a href="{{ url_for('pages.products_page') }}" class="nav-link {% if active_page == 'products' %}active{% endif %}">Products</a>
+                        <a href="{{ url_for('pages.countries_page') }}" class="nav-link {% if active_page == 'countries' %}active{% endif %}">Countries</a>
+                        <a href="{{ url_for('pages.company_page') }}" class="nav-link {% if active_page == 'company' %}active{% endif %}">Company</a>
+                        <a href="{{ url_for('pages.generate_page') }}" class="nav-link {% if active_page == 'generate' %}active{% endif %}">Generate</a>
                         <form method="post" action="{{ url_for('auth.signout') }}" class="signout-form">
                             <button type="submit" class="nav-link nav-button">Sign Out</button>
                         </form>
@@ -45,15 +45,15 @@
         {% if current_user %}
         <div class="workflow-bar">
             <div class="workflow-steps">
-                <a href="/import" class="workflow-step {% if active_page in ['import', 'import_pdf'] %}current{% elif active_page in ['products', 'generate', 'dashboard'] %}done{% endif %}">
+                <a href="{{ url_for('pages.import_page') }}" class="workflow-step {% if active_page in ['import', 'import_pdf'] %}current{% elif active_page in ['products', 'generate', 'dashboard'] %}done{% endif %}">
                     <span class="step-num">1</span> Import
                 </a>
                 <span class="workflow-arrow">→</span>
-                <a href="/products" class="workflow-step {% if active_page == 'products' %}current{% elif active_page in ['generate', 'dashboard'] %}done{% endif %}">
+                <a href="{{ url_for('pages.products_page') }}" class="workflow-step {% if active_page == 'products' %}current{% elif active_page in ['generate', 'dashboard'] %}done{% endif %}">
                     <span class="step-num">2</span> Manage
                 </a>
                 <span class="workflow-arrow">→</span>
-                <a href="/generate" class="workflow-step {% if active_page == 'generate' %}current{% elif active_page == 'dashboard' %}done{% endif %}">
+                <a href="{{ url_for('pages.generate_page') }}" class="workflow-step {% if active_page == 'generate' %}current{% elif active_page == 'dashboard' %}done{% endif %}">
                     <span class="step-num">3</span> Generate
                 </a>
                 <span class="workflow-arrow">→</span>
@@ -75,6 +75,9 @@
 
     <div id="toastContainer" class="toast-container" aria-live="polite"></div>
 
+    <script>
+        window.APP_BASE_URL = {{ (request.script_root or config.APP_BASE_PATH)|tojson }};
+    </script>
     <script src="{{ url_for('static', filename='js/api.js') }}"></script>
     <script src="{{ url_for('static', filename='js/notifications.js') }}"></script>
     {% block scripts %}{% endblock %}

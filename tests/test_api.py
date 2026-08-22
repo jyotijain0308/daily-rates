@@ -44,6 +44,30 @@ class TestDatabaseUrlConfiguration(unittest.TestCase):
             )
 
 
+class TestApplicationPrefix(unittest.TestCase):
+    """Subdirectory hosting support for cPanel deployments."""
+
+    def setUp(self):
+        self.db_fd, self.db_path = tempfile.mkstemp(suffix='.db')
+
+    def tearDown(self):
+        os.close(self.db_fd)
+        os.unlink(self.db_path)
+
+    def test_app_url_path_prefix_is_supported(self):
+        with patch.dict(os.environ, {'APP_URL': 'https://example.com/taaza-rates'}, clear=False):
+            app = create_app({
+                'TESTING': True,
+                'SQLALCHEMY_DATABASE_URI': f'sqlite:///{self.db_path}',
+            })
+
+        with app.test_client() as client:
+            response = client.get('/taaza-rates/health')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()['status'], 'healthy')
+
+
 class TestPPTDailyRatesAPI(unittest.TestCase):
     """Integration tests covering the full workflow"""
 

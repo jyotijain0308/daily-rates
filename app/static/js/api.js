@@ -1,6 +1,20 @@
 const API = {
+    baseUrl() {
+        return (window.APP_BASE_URL || '').replace(/\/+$/, '');
+    },
+
+    url(path) {
+        if (!path || /^https?:\/\//i.test(path)) {
+            return path;
+        }
+        if (path.startsWith('/')) {
+            return `${this.baseUrl()}${path}`;
+        }
+        return path;
+    },
+
     async request(url, options = {}) {
-        const response = await fetch(url, {
+        const response = await fetch(this.url(url), {
             headers: {
                 'Accept': 'application/json',
                 ...(options.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
@@ -187,7 +201,7 @@ const API = {
     },
 
     sampleCsvUrl() {
-        return '/api/import/sample';
+        return this.url('/api/import/sample');
     },
 
     generatePpt(options = {}) {
@@ -382,11 +396,11 @@ const API = {
     },
 
     downloadUrl(filename) {
-        return `/api/generation/download/${encodeURIComponent(filename)}`;
+        return this.url(`/api/generation/download/${encodeURIComponent(filename)}`);
     },
 
     previewUrl(filename) {
-        return `/api/generation/preview/${encodeURIComponent(filename)}`;
+        return this.url(`/api/generation/preview/${encodeURIComponent(filename)}`);
     },
 };
 
