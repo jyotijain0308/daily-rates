@@ -287,6 +287,36 @@ gunicorn "wsgi:create_app()" --bind 0.0.0.0:8000 --workers 2
 
 Or use the included `Procfile` with Heroku or similar platforms.
 
+### Render Deployment
+
+Production now runs on Render as a Python web service. The included `render.yaml`
+pins Python 3.12.8 and uses Gunicorn:
+
+```bash
+gunicorn "wsgi:create_app()" --bind 0.0.0.0:$PORT --workers 2
+```
+
+Set these environment variables in the Render service:
+
+- `APP_URL=https://rates.easternfarmsllc.com`
+- `DATABASE_URL`
+- `SECRET_KEY`
+- optional social/OpenAI settings from `.env.production`
+
+Do not set `APP_BASE_PATH` for the Render subdomain. That setting is only for
+hosting the app under a path such as `/taaza-rates`.
+
+Run migrations from Render Shell after the first deploy, or before deploying a
+schema-changing release:
+
+```bash
+flask --app "wsgi:create_app" db upgrade
+```
+
+Render Free service storage is ephemeral. Runtime files in `uploads/`, `output/`,
+and cache directories can disappear on restart or deploy; use persistent object
+storage for production uploads/generated assets.
+
 For Docker Compose deployments, the included `docker-compose.yml` starts the Flask app and passes `DATABASE_URL` to it. The configured database must already be reachable. Create a real `.env` file from the committed example and keep `.env` only on the server:
 
 ```bash
@@ -299,27 +329,13 @@ By default this exposes the app at [http://localhost:8000](http://localhost:8000
 
 Do not commit `.env`; it is already ignored by git.
 
-For GitHub Actions cPanel deployment, set these repository secrets:
-
-- `CPANEL_HOST` optional; defaults to `66.116.209.154`
-- `CPANEL_PORT` optional; defaults to `22`
-- `CPANEL_USER`
-- `CPANEL_SSH_KEY`
-- `CPANEL_APP_DIR`, for example `/home/<cpanel-user>/daily-rates`
-- `CPANEL_PYTHON` optional; defaults to `python3.12`
-- `DATABASE_URL`
-- `SECRET_KEY`
-- `PRODUCTION_ENV`, containing the rest of the production `.env` values as `KEY=value` lines
-
-For cPanel MySQL, create a database and database user in cPanel, assign the user to the database, then set `DATABASE_URL` in GitHub secrets:
+For cPanel MySQL, create a database and database user in cPanel, assign the user to the database, then set `DATABASE_URL` in Render:
 
 ```text
 mysql+pymysql://cpaneluser_dbuser:your-password@localhost:3306/cpaneluser_dbname?charset=utf8mb4
 ```
 
-If your password contains special characters, URL-encode them before adding the secret.
-
-Keep `DATABASE_URL` and `SECRET_KEY` as dedicated GitHub secrets. Put optional application settings such as `OPENAI_API_KEY`, social platform keys, and feature toggles in the `PRODUCTION_ENV` repository secret.
+If your password contains special characters, URL-encode them before adding the environment variable.
 
 Free local AI PDF import uses Ollama by default:
 
@@ -581,26 +597,16 @@ GitHub Actions workflows are provided under `.github/workflows/`.
 
 `ci.yml` runs on push and pull requests to `main` or `master`:
 
-- sets up Python 3.12
+- sets up Python 3.12.8
 - installs `requirements.txt`
 - compiles the main Python modules
 - runs `python -m unittest tests/test_api.py`
 
 ### CD
 
-`cd.yml` deploys to the cPanel server over SSH after tests pass. It:
-
-- uploads the source to `CPANEL_APP_DIR`
-- preserves runtime directories: `uploads/`, `output/`, and `instance/`
-- syncs committed default assets under `uploads/assets/`
-- creates or reuses a remote `.venv`
-- installs `requirements.txt`
-- writes the production `.env` from GitHub secrets
-- runs `flask --app 'wsgi:create_app' db upgrade`
-- validates `/health` through Flask's test client
-- touches `tmp/restart.txt` for Passenger/cPanel Python app restart
-
-For cPanel Python hosting, use `passenger_wsgi.py` as the application entry file.
+Render deploys production automatically from the connected GitHub branch. The
+repository includes `render.yaml` for the Python runtime, build command, and
+Gunicorn start command.
 
 ---
 
