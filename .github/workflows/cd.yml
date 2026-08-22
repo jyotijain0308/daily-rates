@@ -1,4 +1,4 @@
-name: Deploy to cPanel
+name: Deploy to Production
 
 on:
   workflow_dispatch:
@@ -26,7 +26,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: "3.9"
           cache: pip
 
       - name: Install dependencies
@@ -43,7 +43,7 @@ jobs:
         run: python -m unittest tests/test_api.py
 
   deploy:
-    name: Deploy on cPanel
+    name: Deploy to Production
     runs-on: ubuntu-latest
     needs: test
     environment: production
@@ -171,7 +171,7 @@ jobs:
           printf -v REMOTE_ENV \
             "CPANEL_APP_DIR=%q CPANEL_PYTHON=%q" \
             "$CPANEL_APP_DIR" \
-            "${CPANEL_PYTHON:-python3.12}"
+            "${CPANEL_PYTHON:-}"
 
           ssh -i ~/.ssh/cpanel_key \
             -p "${CPANEL_PORT}" \
@@ -182,7 +182,30 @@ jobs:
           set -euo pipefail
 
           cd "$CPANEL_APP_DIR"
-          PYTHON_BIN="${CPANEL_PYTHON:-python3.12}"
+          if [ -n "${CPANEL_PYTHON:-}" ]; then
+            PYTHON_BIN="$CPANEL_PYTHON"
+          else
+            PYTHON_BIN=""
+            for candidate in python3.12 python3.11 python3.10 python3.9 python3 python; do
+              if command -v "$candidate" >/dev/null 2>&1; then
+                PYTHON_BIN="$candidate"
+                break
+              fi
+            done
+          fi
+
+          if [ -z "$PYTHON_BIN" ]; then
+            echo "No Python 3 interpreter found. Set CPANEL_PYTHON to the Python path shown in cPanel."
+            exit 1
+          fi
+
+          "$PYTHON_BIN" - <<'PY'
+          import sys
+
+          if sys.version_info < (3, 9):
+              raise SystemExit(f"Python 3.9+ is required, found {sys.version.split()[0]}")
+          print(f"Using Python {sys.version.split()[0]}")
+          PY
 
           if [ ! -x .venv/bin/python ]; then
             "$PYTHON_BIN" -m venv .venv

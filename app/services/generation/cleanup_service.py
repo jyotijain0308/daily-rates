@@ -2,6 +2,7 @@
 import logging
 from datetime import date, datetime, timedelta
 from pathlib import Path
+from typing import Optional
 
 from app.services.generation.config import (
     OUTPUT_CLEANUP_DIRS,
@@ -16,7 +17,7 @@ from app.services.storage_service import (
 logger = logging.getLogger(__name__)
 
 
-def cleanup_previous_day_outputs(today: date | None = None) -> int:
+def cleanup_previous_day_outputs(today: Optional[date] = None) -> int:
     """Delete generated output files older than the current day."""
     if not OUTPUT_CLEANUP_ENABLED:
         return 0

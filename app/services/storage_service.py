@@ -1,5 +1,6 @@
 """Shared filesystem paths for user-uploaded and generated artifacts."""
 from pathlib import Path
+from typing import List, Optional, Union
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -23,7 +24,10 @@ def ensure_storage_dirs() -> None:
         directory.mkdir(parents=True, exist_ok=True)
 
 
-def resolve_asset_file(path_or_name: str | Path | None, extra_dirs: list[Path] | None = None) -> Path | None:
+def resolve_asset_file(
+    path_or_name: Optional[Union[str, Path]],
+    extra_dirs: Optional[List[Path]] = None,
+) -> Optional[Path]:
     """Resolve asset paths from uploads storage and legacy asset path formats."""
     if not path_or_name:
         return None
@@ -69,7 +73,7 @@ def generation_job_path(job_id: str, suffix: str = ".json") -> Path:
     return GENERATION_JOB_DIR / f"{job_id}{suffix}"
 
 
-def resolve_generated_file(filename_or_path: str | Path | None) -> Path | None:
+def resolve_generated_file(filename_or_path: Optional[Union[str, Path]]) -> Optional[Path]:
     """Resolve generated files from uploads storage."""
     if not filename_or_path:
         return None
