@@ -78,7 +78,7 @@ EXCHANGE_RATE_API_URL = "https://api.exchangerate-api.com/v4/latest"
 CACHE_DURATION_HOURS = 24  # Cache exchange rates for 24 hours
 
 # Data file paths
-PRODUCTS_DATA_FILE = str(PROJECT_ROOT / "data" / "products.csv")
+PRODUCTS_DATA_FILE = str(PROJECT_ROOT / "app" / "static" / "assets" / "products.csv")
 OUTPUT_PPT_FILE = str(PROJECT_ROOT / "uploads" / "generated" / "presentations" / "daily_rates.pptx")
 OUTPUT_CLEANUP_ENABLED = True
 OUTPUT_CLEANUP_DIRS = [

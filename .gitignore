@@ -10,5 +10,7 @@ uploads/generated/
 uploads/jobs/
 instance/
 .env
+.env.*
 *.log
 .DS_Store
+data/

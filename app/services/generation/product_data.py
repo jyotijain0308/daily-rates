@@ -117,7 +117,7 @@ class ProductDataLoader:
             raise ValueError(f"Unsupported file format: {path.suffix}")
     
     @staticmethod
-    def create_sample_data(output_file: str = str(PROJECT_ROOT / "data" / "products.csv")):
+    def create_sample_data(output_file: str = str(PROJECT_ROOT / "app" / "static" / "assets" / "products.csv")):
         """Create sample product data for testing"""
         sample_data = [
             ['S.No.', 'Country of origin', 'Shipment by', 'Product Name', 'Weight in kg', 'Packing', 'Price in AED'],

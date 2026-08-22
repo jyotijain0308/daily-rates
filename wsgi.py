@@ -50,14 +50,14 @@ def load_local_env() -> None:
 
 
 def get_database_uri() -> str:
-    """Return the configured PostgreSQL database URI."""
+    """Return the configured SQLAlchemy database URI."""
     load_local_env()
     database_url = os.getenv('DATABASE_URL')
     if not database_url:
         raise RuntimeError(
-            "DATABASE_URL is required. This project uses PostgreSQL. Start a "
-            "reachable PostgreSQL server and set DATABASE_URL before running "
-            "the app or Python commands."
+            "DATABASE_URL is required. Start a reachable PostgreSQL or MySQL "
+            "server and set DATABASE_URL before running the app or Python "
+            "commands."
         )
 
     # Some platforms still expose SQLAlchemy's old postgres:// scheme.
@@ -65,6 +65,8 @@ def get_database_uri() -> str:
         return database_url.replace('postgres://', 'postgresql+psycopg://', 1)
     if database_url.startswith('postgresql://'):
         return database_url.replace('postgresql://', 'postgresql+psycopg://', 1)
+    if database_url.startswith('mysql://'):
+        return database_url.replace('mysql://', 'mysql+pymysql://', 1)
 
     return database_url
 

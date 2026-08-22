@@ -1,16 +1,7 @@
-name: Deploy to AWS EC2
+name: Deploy to cPanel
 
 on:
   workflow_dispatch:
-    inputs:
-      environment:
-        description: Deployment environment name
-        required: true
-        default: production
-        type: choice
-        options:
-          - staging
-          - production
   push:
     branches:
       - main
@@ -18,17 +9,15 @@ on:
 
 permissions:
   contents: read
-  packages: write
 
 env:
-  REGISTRY: ghcr.io
-  CONTAINER_NAME: ppt-daily-rates
-  APP_DIR: /opt/ppt-daily-rates
+  DEFAULT_CPANEL_HOST: 66.116.209.154
+  DEFAULT_CPANEL_PORT: "22"
 
 jobs:
   test:
     name: Test
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
 
     steps:
       - name: Check out repository
@@ -45,297 +34,176 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Compile source
+        run: python -m compileall -q app db.py wsgi.py passenger_wsgi.py
+
       - name: Run tests
+        env:
+          PYTHONWARNINGS: default
         run: python -m unittest tests/test_api.py
 
-  build-and-push:
-    name: Build and push Docker image
+  deploy:
+    name: Deploy on cPanel
     runs-on: ubuntu-latest
     needs: test
-
-    outputs:
-      image: ${{ steps.image.outputs.image }}
+    environment: production
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Resolve image name
-        id: image
-        run: |
-          IMAGE="${REGISTRY}/${GITHUB_REPOSITORY,,}"
-          echo "image=${IMAGE}" >> "$GITHUB_OUTPUT"
-
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build and push
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          push: true
-          tags: |
-            ${{ steps.image.outputs.image }}:${{ github.sha }}
-            ${{ steps.image.outputs.image }}:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-  deploy:
-    name: Deploy on EC2
-    runs-on: ubuntu-latest
-    needs: build-and-push
-    environment: ${{ github.event.inputs.environment || 'production' }}
-
-    steps:
-      - name: Configure SSH
+      - name: Validate deployment secrets
         env:
-          SSH_HOST: ${{ secrets.AWS_HOST || secrets.EC2_HOST }}
-          SSH_USER: ${{ secrets.AWS_USER || secrets.EC2_USER }}
-          SSH_KEY: ${{ secrets.AWS_SSH_KEY || secrets.EC2_SSH_KEY }}
+          CPANEL_HOST: ${{ secrets.CPANEL_HOST }}
+          CPANEL_USER: ${{ secrets.CPANEL_USER }}
+          CPANEL_SSH_KEY: ${{ secrets.CPANEL_SSH_KEY }}
+          CPANEL_APP_DIR: ${{ secrets.CPANEL_APP_DIR }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SECRET_KEY: ${{ secrets.SECRET_KEY }}
+          PRODUCTION_ENV: ${{ secrets.PRODUCTION_ENV }}
         run: |
           set -euo pipefail
 
-          if [ -z "${SSH_HOST}" ] || [ -z "${SSH_USER}" ] || [ -z "${SSH_KEY}" ]; then
-            echo "Missing one or more required SSH secrets."
-            echo "Set EC2_HOST, EC2_USER, EC2_SSH_KEY as repository secrets."
+          if [ -z "${CPANEL_USER}" ] || [ -z "${CPANEL_SSH_KEY}" ] || [ -z "${CPANEL_APP_DIR}" ]; then
+            echo "Missing cPanel SSH secrets. Set CPANEL_USER, CPANEL_SSH_KEY, and CPANEL_APP_DIR."
             exit 1
           fi
 
-          mkdir -p ~/.ssh
-          chmod 700 ~/.ssh
-          printf '%s\n' "${SSH_KEY}" | tr -d '\r' > ~/.ssh/aws_ec2_key
-          chmod 600 ~/.ssh/aws_ec2_key
-          ssh-keygen -y -f ~/.ssh/aws_ec2_key > /dev/null
-          ssh-keyscan -H "${SSH_HOST}" >> ~/.ssh/known_hosts
+          if [ -z "${CPANEL_HOST:-${DEFAULT_CPANEL_HOST}}" ]; then
+            echo "Missing cPanel host. Set CPANEL_HOST or update DEFAULT_CPANEL_HOST in this workflow."
+            exit 1
+          fi
 
-      - name: Deploy container
+          if [ -z "${DATABASE_URL}" ] || [ -z "${SECRET_KEY}" ]; then
+            echo "Missing application secrets. Set DATABASE_URL and SECRET_KEY."
+            exit 1
+          fi
+
+          if [ -z "${PRODUCTION_ENV}" ]; then
+            echo "Missing PRODUCTION_ENV repository secret. Add .env-style production settings there."
+            exit 1
+          fi
+
+          case "${DATABASE_URL}" in
+            postgres://*|postgresql://*|postgresql+psycopg://*|mysql://*|mysql+pymysql://*) ;;
+            *)
+              echo "DATABASE_URL must point to PostgreSQL or MySQL."
+              exit 1
+              ;;
+          esac
+
+      - name: Configure SSH
         env:
-          SSH_HOST: ${{ secrets.AWS_HOST || secrets.EC2_HOST }}
-          SSH_USER: ${{ secrets.AWS_USER || secrets.EC2_USER }}
-          IMAGE: ${{ needs.build-and-push.outputs.image }}:${{ github.sha }}
-          GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
-          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
-          POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
-          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
-          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          PDF_TABLE_EXTRACTION_PROVIDER: ${{ secrets.PDF_TABLE_EXTRACTION_PROVIDER }}
-          OPENAI_PDF_EXTRACTION_MODEL: ${{ secrets.OPENAI_PDF_EXTRACTION_MODEL }}
-          OLLAMA_BASE_URL: ${{ secrets.OLLAMA_BASE_URL }}
-          OLLAMA_PDF_EXTRACTION_MODEL: ${{ secrets.OLLAMA_PDF_EXTRACTION_MODEL }}
-          PRODUCT_IMAGE_AUTO_FETCH: ${{ secrets.PRODUCT_IMAGE_AUTO_FETCH }}
-          PRODUCT_IMAGE_PREFETCH_ON_GENERATE: ${{ secrets.PRODUCT_IMAGE_PREFETCH_ON_GENERATE }}
-          PRODUCT_IMAGE_PREFETCH_LIMIT: ${{ secrets.PRODUCT_IMAGE_PREFETCH_LIMIT }}
-          PRODUCT_IMAGE_FETCH_TIMEOUT_SECONDS: ${{ secrets.PRODUCT_IMAGE_FETCH_TIMEOUT_SECONDS }}
+          CPANEL_HOST: ${{ secrets.CPANEL_HOST || env.DEFAULT_CPANEL_HOST }}
+          CPANEL_PORT: ${{ secrets.CPANEL_PORT || env.DEFAULT_CPANEL_PORT }}
+          CPANEL_SSH_KEY: ${{ secrets.CPANEL_SSH_KEY }}
         run: |
           set -euo pipefail
 
-          printf -v REMOTE_ENV \
-            "IMAGE=%q GHCR_USERNAME=%q GHCR_TOKEN=%q CONTAINER_NAME=%q APP_DIR=%q POSTGRES_DB=%q POSTGRES_USER=%q POSTGRES_PASSWORD=%q DATABASE_URL=%q OPENAI_API_KEY=%q PDF_TABLE_EXTRACTION_PROVIDER=%q OPENAI_PDF_EXTRACTION_MODEL=%q OLLAMA_BASE_URL=%q OLLAMA_PDF_EXTRACTION_MODEL=%q PRODUCT_IMAGE_AUTO_FETCH=%q PRODUCT_IMAGE_PREFETCH_ON_GENERATE=%q PRODUCT_IMAGE_PREFETCH_LIMIT=%q PRODUCT_IMAGE_FETCH_TIMEOUT_SECONDS=%q" \
-            "$IMAGE" \
-            "$GHCR_USERNAME" \
-            "$GHCR_TOKEN" \
-            "$CONTAINER_NAME" \
-            "$APP_DIR" \
-            "$POSTGRES_DB" \
-            "$POSTGRES_USER" \
-            "$POSTGRES_PASSWORD" \
-            "$DATABASE_URL" \
-            "$OPENAI_API_KEY" \
-            "$PDF_TABLE_EXTRACTION_PROVIDER" \
-            "$OPENAI_PDF_EXTRACTION_MODEL" \
-            "$OLLAMA_BASE_URL" \
-            "$OLLAMA_PDF_EXTRACTION_MODEL" \
-            "$PRODUCT_IMAGE_AUTO_FETCH" \
-            "$PRODUCT_IMAGE_PREFETCH_ON_GENERATE" \
-            "$PRODUCT_IMAGE_PREFETCH_LIMIT" \
-            "$PRODUCT_IMAGE_FETCH_TIMEOUT_SECONDS"
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "${CPANEL_SSH_KEY}" | tr -d '\r' > ~/.ssh/cpanel_key
+          chmod 600 ~/.ssh/cpanel_key
+          ssh-keygen -y -f ~/.ssh/cpanel_key > /dev/null
+          ssh-keyscan -p "${CPANEL_PORT}" -H "${CPANEL_HOST}" >> ~/.ssh/known_hosts
 
-          ssh -i ~/.ssh/aws_ec2_key \
+      - name: Upload source
+        env:
+          CPANEL_HOST: ${{ secrets.CPANEL_HOST || env.DEFAULT_CPANEL_HOST }}
+          CPANEL_PORT: ${{ secrets.CPANEL_PORT || env.DEFAULT_CPANEL_PORT }}
+          CPANEL_USER: ${{ secrets.CPANEL_USER }}
+          CPANEL_APP_DIR: ${{ secrets.CPANEL_APP_DIR }}
+        run: |
+          set -euo pipefail
+
+          ssh -i ~/.ssh/cpanel_key \
+            -p "${CPANEL_PORT}" \
             -o BatchMode=yes \
             -o IdentitiesOnly=yes \
-            "${SSH_USER}@${SSH_HOST}" \
+            "${CPANEL_USER}@${CPANEL_HOST}" \
+            "mkdir -p '${CPANEL_APP_DIR}' '${CPANEL_APP_DIR}/uploads' '${CPANEL_APP_DIR}/output' '${CPANEL_APP_DIR}/instance' '${CPANEL_APP_DIR}/tmp'"
+
+          rsync -az --delete \
+            -e "ssh -i ~/.ssh/cpanel_key -p ${CPANEL_PORT} -o BatchMode=yes -o IdentitiesOnly=yes" \
+            --exclude ".git/" \
+            --exclude ".github/" \
+            --exclude ".venv/" \
+            --exclude "__pycache__/" \
+            --exclude "*.pyc" \
+            --exclude ".env" \
+            --exclude "instance/" \
+            --exclude "output/" \
+            --exclude "uploads/" \
+            ./ "${CPANEL_USER}@${CPANEL_HOST}:${CPANEL_APP_DIR}/"
+
+          rsync -az \
+            -e "ssh -i ~/.ssh/cpanel_key -p ${CPANEL_PORT} -o BatchMode=yes -o IdentitiesOnly=yes" \
+            uploads/assets/ "${CPANEL_USER}@${CPANEL_HOST}:${CPANEL_APP_DIR}/uploads/assets/"
+
+      - name: Configure and restart app
+        env:
+          CPANEL_HOST: ${{ secrets.CPANEL_HOST || env.DEFAULT_CPANEL_HOST }}
+          CPANEL_PORT: ${{ secrets.CPANEL_PORT || env.DEFAULT_CPANEL_PORT }}
+          CPANEL_USER: ${{ secrets.CPANEL_USER }}
+          CPANEL_APP_DIR: ${{ secrets.CPANEL_APP_DIR }}
+          CPANEL_PYTHON: ${{ secrets.CPANEL_PYTHON }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SECRET_KEY: ${{ secrets.SECRET_KEY }}
+          PRODUCTION_ENV: ${{ secrets.PRODUCTION_ENV }}
+        run: |
+          set -euo pipefail
+
+          ENV_FILE="$(mktemp)"
+          {
+            printf 'DATABASE_URL=%s\n' "${DATABASE_URL}"
+            printf 'SECRET_KEY=%s\n' "${SECRET_KEY}"
+            printf '\n'
+            printf '%s\n' "${PRODUCTION_ENV}"
+          } >> "${ENV_FILE}"
+
+          scp -i ~/.ssh/cpanel_key \
+            -P "${CPANEL_PORT}" \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            "${ENV_FILE}" "${CPANEL_USER}@${CPANEL_HOST}:${CPANEL_APP_DIR}/.env"
+          rm -f "${ENV_FILE}"
+
+          printf -v REMOTE_ENV \
+            "CPANEL_APP_DIR=%q CPANEL_PYTHON=%q" \
+            "$CPANEL_APP_DIR" \
+            "${CPANEL_PYTHON:-python3.12}"
+
+          ssh -i ~/.ssh/cpanel_key \
+            -p "${CPANEL_PORT}" \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            "${CPANEL_USER}@${CPANEL_HOST}" \
             "${REMOTE_ENV} bash -s" <<'EOF'
           set -euo pipefail
 
-          if [ ! -d "$APP_DIR" ] || [ ! -w "$APP_DIR" ]; then
-            sudo mkdir -p "$APP_DIR"
-            sudo chown -R "$(id -u):$(id -g)" "$APP_DIR"
+          cd "$CPANEL_APP_DIR"
+          PYTHON_BIN="${CPANEL_PYTHON:-python3.12}"
+
+          if [ ! -x .venv/bin/python ]; then
+            "$PYTHON_BIN" -m venv .venv
           fi
 
-          mkdir -p "$APP_DIR"/{instance,output,uploads,assets}
-          APP_NETWORK="${CONTAINER_NAME}-network"
-          POSTGRES_CONTAINER_NAME="${CONTAINER_NAME}-postgres"
-          POSTGRES_VOLUME_NAME="${CONTAINER_NAME}-postgres-data"
+          .venv/bin/python -m pip install --upgrade pip
+          .venv/bin/python -m pip install -r requirements.txt
 
-          if [ -z "${DATABASE_URL:-}" ]; then
-            if [ -z "${POSTGRES_DB:-}" ] || [ -z "${POSTGRES_USER:-}" ] || [ -z "${POSTGRES_PASSWORD:-}" ]; then
-              echo "Missing database secrets. Set DATABASE_URL, or set POSTGRES_DB, POSTGRES_USER, and POSTGRES_PASSWORD."
-              exit 1
-            fi
-            DATABASE_URL="$(POSTGRES_CONTAINER_NAME="$POSTGRES_CONTAINER_NAME" python3 - <<'PY'
-          import os
-          import sys
-          from urllib.parse import quote
-
-          user = quote(os.environ["POSTGRES_USER"], safe="")
-          password = quote(os.environ["POSTGRES_PASSWORD"], safe="")
-          database = quote(os.environ["POSTGRES_DB"], safe="")
-          host = os.environ.get("POSTGRES_CONTAINER_NAME")
-          if not host:
-              sys.exit("POSTGRES_CONTAINER_NAME was not provided to DATABASE_URL builder")
-          print(f"postgresql+psycopg://{user}:{password}@{host}:5432/{database}")
-          PY
-          )"
-          fi
-
-          if [ -n "${GHCR_USERNAME:-}" ] && [ -n "${GHCR_TOKEN:-}" ]; then
-            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
-          fi
-
-          docker pull "$IMAGE"
-          docker network create "$APP_NETWORK" 2>/dev/null || true
-
-          if [ -n "${POSTGRES_DB:-}" ] && [ -n "${POSTGRES_USER:-}" ] && [ -n "${POSTGRES_PASSWORD:-}" ]; then
-            docker volume create "$POSTGRES_VOLUME_NAME" >/dev/null
-
-            if docker ps -a --format '{{.Names}}' | grep -Fxq "$POSTGRES_CONTAINER_NAME"; then
-              docker start "$POSTGRES_CONTAINER_NAME" >/dev/null
-            else
-              docker run -d \
-                --name "$POSTGRES_CONTAINER_NAME" \
-                --restart unless-stopped \
-                --network "$APP_NETWORK" \
-                -e POSTGRES_DB="$POSTGRES_DB" \
-                -e POSTGRES_USER="$POSTGRES_USER" \
-                -e POSTGRES_PASSWORD="$POSTGRES_PASSWORD" \
-                -v "$POSTGRES_VOLUME_NAME:/var/lib/postgresql/data" \
-                postgres:16-alpine
-            fi
-            docker network connect "$APP_NETWORK" "$POSTGRES_CONTAINER_NAME" 2>/dev/null || true
-
-            for attempt in $(seq 1 30); do
-              if docker exec "$POSTGRES_CONTAINER_NAME" pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB" >/dev/null 2>&1; then
-                break
-              fi
-              if [ "$attempt" -eq 30 ]; then
-                echo "PostgreSQL did not become ready in time."
-                docker logs "$POSTGRES_CONTAINER_NAME" || true
-                exit 1
-              fi
-              sleep 2
-            done
-
-            POSTGRES_USER_IDENT="$(POSTGRES_USER="$POSTGRES_USER" python3 - <<'PY'
-          import os
-          user = os.environ["POSTGRES_USER"]
-          print('"' + user.replace('"', '""') + '"')
-          PY
-          )"
-
-            POSTGRES_PASSWORD_LITERAL="$(POSTGRES_PASSWORD="$POSTGRES_PASSWORD" python3 - <<'PY'
-          import os
-          password = os.environ["POSTGRES_PASSWORD"]
-          print("'" + password.replace("'", "''") + "'")
-          PY
-          )"
-
-            printf 'ALTER USER %s WITH PASSWORD %s;\n' "$POSTGRES_USER_IDENT" "$POSTGRES_PASSWORD_LITERAL" | \
-              docker exec -i "$POSTGRES_CONTAINER_NAME" psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"
-          fi
-
-          # Seed the persistent assets volume from the image on first deploy only.
-          if [ -z "$(find "$APP_DIR/assets" -mindepth 1 -maxdepth 1 2>/dev/null)" ]; then
-            TEMP_CONTAINER="$(docker create "$IMAGE")"
-            docker cp "$TEMP_CONTAINER:/app/src/assets/." "$APP_DIR/assets/"
-            docker rm "$TEMP_CONTAINER"
-          else
-            TEMP_CONTAINER="$(docker create "$IMAGE")"
-            for ASSET_FILE in company_logo.png logo.jpg uae_logo.jpg; do
-              if [ ! -f "$APP_DIR/assets/$ASSET_FILE" ]; then
-                docker cp "$TEMP_CONTAINER:/app/src/assets/$ASSET_FILE" "$APP_DIR/assets/$ASSET_FILE" 2>/dev/null || true
-              fi
-            done
-            docker rm "$TEMP_CONTAINER"
-          fi
-
-          docker stop "$CONTAINER_NAME" 2>/dev/null || true
-          docker rm "$CONTAINER_NAME" 2>/dev/null || true
-          EXISTING_PORT_80_CONTAINER="$(docker ps --filter publish=80 --format '{{.ID}}' | head -n 1 || true)"
-          if [ -n "$EXISTING_PORT_80_CONTAINER" ]; then
-            docker stop "$EXISTING_PORT_80_CONTAINER"
-          fi
-
-          docker run -d \
-            --name "$CONTAINER_NAME" \
-            --restart unless-stopped \
-            --network "$APP_NETWORK" \
-            --add-host host.docker.internal:host-gateway \
-            -p 80:8000 \
-            -e PORT=8000 \
-            -e DATABASE_URL="$DATABASE_URL" \
-            -e OPENAI_API_KEY="${OPENAI_API_KEY:-}" \
-            -e PDF_TABLE_EXTRACTION_PROVIDER="${PDF_TABLE_EXTRACTION_PROVIDER:-ollama}" \
-            -e OPENAI_PDF_EXTRACTION_MODEL="${OPENAI_PDF_EXTRACTION_MODEL:-gpt-4o-mini}" \
-            -e OLLAMA_BASE_URL="${OLLAMA_BASE_URL:-http://host.docker.internal:11434}" \
-            -e OLLAMA_PDF_EXTRACTION_MODEL="${OLLAMA_PDF_EXTRACTION_MODEL:-llama3.2-vision}" \
-            -e PRODUCT_IMAGE_AUTO_FETCH="${PRODUCT_IMAGE_AUTO_FETCH:-true}" \
-            -e PRODUCT_IMAGE_PREFETCH_ON_GENERATE="${PRODUCT_IMAGE_PREFETCH_ON_GENERATE:-true}" \
-            -e PRODUCT_IMAGE_PREFETCH_LIMIT="${PRODUCT_IMAGE_PREFETCH_LIMIT:-20}" \
-            -e PRODUCT_IMAGE_FETCH_TIMEOUT_SECONDS="${PRODUCT_IMAGE_FETCH_TIMEOUT_SECONDS:-5}" \
-            -v "$APP_DIR/instance:/app/instance" \
-            -v "$APP_DIR/output:/app/output" \
-            -v "$APP_DIR/uploads:/app/uploads" \
-            -v "$APP_DIR/assets:/app/src/assets" \
-            "$IMAGE"
-
-          docker image prune -f
-
-          for attempt in $(seq 1 30); do
-            if ! docker ps -a --format '{{.Names}}' | grep -Fxq "$CONTAINER_NAME"; then
-              echo "Application container was not created."
-              exit 1
-            fi
-
-            if [ "$(docker inspect -f '{{.State.Running}}' "$CONTAINER_NAME")" = "true" ]; then
-              if docker exec "$CONTAINER_NAME" python - <<'PY'
+          .venv/bin/flask --app 'wsgi:create_app' db upgrade
+          .venv/bin/python - <<'PY'
           import json
-          import urllib.request
+          from wsgi import create_app
 
-          with urllib.request.urlopen("http://127.0.0.1:8000/health", timeout=5) as response:
-              payload = json.loads(response.read().decode("utf-8"))
+          app = create_app()
+          with app.test_client() as client:
+              response = client.get("/health")
+              assert response.status_code == 200, response.get_data(as_text=True)
+              payload = json.loads(response.get_data(as_text=True))
               assert payload["status"] == "healthy", payload
           PY
-              then
-                DOCKER_BIN="$(command -v docker)"
-                CRON_MARKER="# ppt-daily-rates cleanup-generations"
-                CRON_COMMAND="0 2 * * * $DOCKER_BIN exec $CONTAINER_NAME flask --app 'wsgi:create_app' cleanup-generations --days 7 >> $APP_DIR/cleanup-generations.log 2>&1 $CRON_MARKER"
-                if command -v crontab >/dev/null 2>&1; then
-                  (crontab -l 2>/dev/null | grep -v "$CRON_MARKER" || true; echo "$CRON_COMMAND") | crontab -
-                  echo "Installed generation cleanup cron."
-                else
-                  echo "crontab command not found; skipping automatic cleanup cron setup."
-                fi
-                exit 0
-              fi
-            else
-              echo "Application container exited before becoming healthy."
-              docker logs "$CONTAINER_NAME" || true
-              exit 1
-            fi
 
-            sleep 2
-          done
-
-          echo "Application container did not become healthy in time."
-          docker logs "$CONTAINER_NAME" || true
-          exit 1
+          mkdir -p tmp
+          touch tmp/restart.txt
           EOF

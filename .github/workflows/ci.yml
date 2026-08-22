@@ -32,7 +32,7 @@ jobs:
           pip install -r requirements.txt
 
       - name: Compile source
-        run: python -m compileall -q app db.py wsgi.py
+        run: python -m compileall -q app db.py wsgi.py passenger_wsgi.py
 
       - name: Run tests
         env:

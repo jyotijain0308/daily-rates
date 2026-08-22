@@ -147,7 +147,7 @@ docker compose down
 
 ### Optional: Run Python Commands Directly
 
-The web app uses PostgreSQL. It does not fall back to SQLite when run outside Docker. For the Flask app container, use `host.docker.internal` so it can reach native PostgreSQL on your Mac:
+The web app uses `DATABASE_URL`; PostgreSQL and MySQL are supported. For the Flask app container with native PostgreSQL on your Mac, use `host.docker.internal`:
 
 ```bash
 DATABASE_URL=postgresql+psycopg://ppt_user:your-password@host.docker.internal:5432/ppt_daily_rates
@@ -157,6 +157,12 @@ For Python commands on your host machine, use `127.0.0.1`:
 
 ```bash
 HOST_DATABASE_URL=postgresql+psycopg://ppt_user:your-password@127.0.0.1:5432/ppt_daily_rates
+```
+
+For cPanel MySQL, use the database name and database user created in cPanel:
+
+```bash
+DATABASE_URL=mysql+pymysql://cpaneluser_dbuser:your-password@localhost:3306/cpaneluser_dbname?charset=utf8mb4
 ```
 
 Use single quotes around manually typed URLs if your password contains shell-special characters.
@@ -265,10 +271,12 @@ python -m unittest tests.test_api -v
 
 ### Production Deployment
 
-Set a PostgreSQL database URL before starting the app:
+Set a database URL before starting the app. PostgreSQL and MySQL are supported:
 
 ```bash
 export DATABASE_URL="postgresql+psycopg://user:password@host:5432/ppt_daily_rates"
+# or
+export DATABASE_URL="mysql+pymysql://user:password@localhost:3306/ppt_daily_rates?charset=utf8mb4"
 ```
 
 Then run from the project root:
@@ -279,7 +287,7 @@ gunicorn "wsgi:create_app()" --bind 0.0.0.0:8000 --workers 2
 
 Or use the included `Procfile` with Heroku or similar platforms.
 
-For Docker Compose deployments, the included `docker-compose.yml` starts the Flask app and passes `DATABASE_URL` to it. PostgreSQL must already be reachable, either as native PostgreSQL on the host or as an external managed database. Create a real `.env` file from the committed example and keep `.env` only on the server:
+For Docker Compose deployments, the included `docker-compose.yml` starts the Flask app and passes `DATABASE_URL` to it. The configured database must already be reachable. Create a real `.env` file from the committed example and keep `.env` only on the server:
 
 ```bash
 cp .env.example .env
@@ -291,17 +299,27 @@ By default this exposes the app at [http://localhost:8000](http://localhost:8000
 
 Do not commit `.env`; it is already ignored by git.
 
-For GitHub Actions EC2 deployment, set these repository secrets:
+For GitHub Actions cPanel deployment, set these repository secrets:
 
-- `EC2_HOST` or `AWS_HOST`
-- `EC2_USER` or `AWS_USER`
-- `EC2_SSH_KEY` or `AWS_SSH_KEY`
-- `POSTGRES_DB`
-- `POSTGRES_USER`
-- `POSTGRES_PASSWORD`
-- `OPENAI_API_KEY` only if using OpenAI for PDF table extraction
+- `CPANEL_HOST` optional; defaults to `66.116.209.154`
+- `CPANEL_PORT` optional; defaults to `22`
+- `CPANEL_USER`
+- `CPANEL_SSH_KEY`
+- `CPANEL_APP_DIR`, for example `/home/<cpanel-user>/daily-rates`
+- `CPANEL_PYTHON` optional; defaults to `python3.12`
+- `DATABASE_URL`
+- `SECRET_KEY`
+- `PRODUCTION_ENV`, containing the rest of the production `.env` values as `KEY=value` lines
 
-Alternatively, set `DATABASE_URL` if you use an external managed PostgreSQL database. If `DATABASE_URL` is not set, the EC2 workflow creates or reuses a local PostgreSQL Docker container with a persistent Docker volume.
+For cPanel MySQL, create a database and database user in cPanel, assign the user to the database, then set `DATABASE_URL` in GitHub secrets:
+
+```text
+mysql+pymysql://cpaneluser_dbuser:your-password@localhost:3306/cpaneluser_dbname?charset=utf8mb4
+```
+
+If your password contains special characters, URL-encode them before adding the secret.
+
+Keep `DATABASE_URL` and `SECRET_KEY` as dedicated GitHub secrets. Put optional application settings such as `OPENAI_API_KEY`, social platform keys, and feature toggles in the `PRODUCTION_ENV` repository secret.
 
 Free local AI PDF import uses Ollama by default:
 
@@ -367,7 +385,7 @@ python -m app.services.generation.main
 
 #### CSV Format
 
-Create `data/products.csv`:
+Create or edit `app/static/assets/products.csv`:
 
 ```csv
 S.No.,Country of origin,Shipment by,Product Name,Weight in kg,Packing,Price in AED
@@ -520,7 +538,7 @@ Example CLI log output:
 
 ```
 2026-06-26 22:22:40,059 - __main__ - INFO - Starting PPT generation workflow...
-2026-06-26 22:22:40,059 - product_data - INFO - Loaded 6 products from data/products.csv
+2026-06-26 22:22:40,059 - product_data - INFO - Loaded 6 products from app/static/assets/products.csv
 2026-06-26 22:22:41,353 - exchange_rates - INFO - Fetched exchange rates from API
 2026-06-26 22:22:45,076 - ppt_generator - INFO - Presentation saved to uploads/generated/presentations/daily_rates.pptx
 ```
@@ -570,23 +588,19 @@ GitHub Actions workflows are provided under `.github/workflows/`.
 
 ### CD
 
-`cd.yml` is a manual deployment workflow (`workflow_dispatch`) with staging/production environment selection. It installs dependencies and runs tests before the deploy hook.
+`cd.yml` deploys to the cPanel server over SSH after tests pass. It:
 
-Add the provider-specific deployment command in the `Deploy hook` step. Common options:
+- uploads the source to `CPANEL_APP_DIR`
+- preserves runtime directories: `uploads/`, `output/`, and `instance/`
+- syncs committed default assets under `uploads/assets/`
+- creates or reuses a remote `.venv`
+- installs `requirements.txt`
+- writes the production `.env` from GitHub secrets
+- runs `flask --app 'wsgi:create_app' db upgrade`
+- validates `/health` through Flask's test client
+- touches `tmp/restart.txt` for Passenger/cPanel Python app restart
 
-- Render deploy hook
-- Heroku deploy
-- Docker image build and push
-- SSH rollout to a VPS
-- AWS Elastic Beanstalk or ECS deployment
-
-Deployment entry point:
-
-```bash
-gunicorn "wsgi:create_app()" --bind 0.0.0.0:$PORT --workers 2
-```
-
-This is also configured in `Procfile`.
+For cPanel Python hosting, use `passenger_wsgi.py` as the application entry file.
 
 ---
 

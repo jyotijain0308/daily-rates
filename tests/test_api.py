@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 from PIL import Image
 
-from wsgi import create_app, db
+from wsgi import create_app, db, get_database_uri
 from app.services.country_service import country_logo_map, seed_default_countries
 from app.models import (
     Country,
@@ -22,6 +22,26 @@ from app.models import (
 from app.services.importing.image_importer import ProductImageOCRImporter
 from app.services.importing.pdf_importer import ProductPDFTableImporter
 from app.services.generation import config as generator_config
+
+
+class TestDatabaseUrlConfiguration(unittest.TestCase):
+    """Database URL normalization used by local and cPanel deployments."""
+
+    def test_mysql_url_uses_pymysql_driver(self):
+        env = {'DATABASE_URL': 'mysql://user:pass@localhost/db', 'HOST_DATABASE_URL': ''}
+        with patch.dict(os.environ, env, clear=False):
+            self.assertEqual(
+                get_database_uri(),
+                'mysql+pymysql://user:pass@localhost/db',
+            )
+
+    def test_postgresql_url_uses_psycopg_driver(self):
+        env = {'DATABASE_URL': 'postgresql://user:pass@localhost/db', 'HOST_DATABASE_URL': ''}
+        with patch.dict(os.environ, env, clear=False):
+            self.assertEqual(
+                get_database_uri(),
+                'postgresql+psycopg://user:pass@localhost/db',
+            )
 
 
 class TestPPTDailyRatesAPI(unittest.TestCase):

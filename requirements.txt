@@ -3,6 +3,7 @@ flask-sqlalchemy==3.1.1
 Flask-Migrate==4.0.7
 flask-cors==4.0.0
 psycopg[binary]==3.2.13
+PyMySQL==1.1.2
 pdfplumber==0.11.5
 pypdfium2==5.10.1
 openai==2.14.0
